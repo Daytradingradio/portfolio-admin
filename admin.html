@@ -16,7 +16,8 @@
     label { display:inline-block; width:120px; }
     input, button { padding:4px 8px; margin:4px; }
     .hidden { display:none; }
-    .btn-sell { color:#c0392b; cursor:pointer; }
+    .btn-sell { color:#c0392b; cursor:pointer; margin-right:8px; }
+    .btn-delete { color:#e74c3c; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -95,6 +96,12 @@
           const data = snap.val() || {};
           Object.entries(data).forEach(([id, tx]) => {
             const row = document.createElement("tr");
+            let actions = "";
+            if (!tx.s_price) {
+              actions = `<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
+            } else {
+              actions = `<span class='btn-delete'>Delete</span>`;
+            }
             row.innerHTML = `
               <td>${tx.sym}</td>
               <td>${tx.qty}</td>
@@ -102,12 +109,19 @@
               <td>${new Date(tx.p_date*1000).toLocaleDateString()}</td>
               <td>${tx.s_price? `$${tx.s_price.toFixed(2)}` : "-"}</td>
               <td>${tx.s_date? new Date(tx.s_date*1000).toLocaleDateString() : "-"}</td>
-              <td>${tx.s_price ? "" : "<span class='btn-sell'>Sell</span>"}</td>
+              <td>${actions}</td>
             `;
-            if (!tx.s_price) {
-              row.querySelector(".btn-sell").onclick = () => promptSell(id);
-            }
             tableBody.appendChild(row);
+            // Sell handler
+            if (!tx.s_price) {
+              row.querySelector('.btn-sell').onclick = () => promptSell(id);
+            }
+            // Delete handler
+            row.querySelector('.btn-delete').onclick = () => {
+              if (confirm('Delete this transaction?')) {
+                db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove();
+              }
+            };
           });
         });
     }
