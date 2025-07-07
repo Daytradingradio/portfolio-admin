@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Portfolio Admin</title>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top:1rem; }
+    th, td { border:1px solid #ccc; padding:8px; text-align:center; }
+    th { background:#f0f0f0; }
+    form { margin-top:1rem; }
+    label { display:inline-block; width:120px; }
+    input, button { padding:4px 8px; margin:4px; }
+    .hidden { display:none; }
+    .btn-sell { color:#c0392b; cursor:pointer; }
+  </style>
+</head>
+<body>
+
+  <h1>Portfolio Admin</h1>
+
+  <!-- ADMIN UI (will show after anonymous auth) -->
+  <div id="adminDiv" class="hidden">
+    <h2>Add New Position</h2>
+    <form id="addForm">
+      <label>Symbol:</label><input id="sym" required><br>
+      <label>Qty:</label><input type="number" id="qty" required><br>
+      <label>Buy Price:</label><input type="number" step="0.01" id="bPrice" required><br>
+      <label>Date:</label><input type="date" id="bDate" required><br>
+      <button type="submit">Add Buy</button>
+    </form>
+
+    <h2>Open & Closed Transactions</h2>
+    <table id="txTable">
+      <thead>
+        <tr>
+          <th>Symbol</th><th>Qty</th><th>Buy Price</th><th>Buy Date</th>
+          <th>Sell Price</th><th>Sell Date</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Firebase Config + Main Script -->
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
+      authDomain: "stock-portfolio-tracker-aefdf.firebaseapp.com",
+      databaseURL: "https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
+      projectId: "stock-portfolio-tracker-aefdf",
+      storageBucket: "stock-portfolio-tracker-aefdf.appspot.com",
+      messagingSenderId: "26263489272",
+      appId: "1:26263489272:web:fe7bc7af204fee016b490d"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+    const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
+    const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
+
+    // Anonymous authentication
+    auth.signInAnonymously().catch(e => console.error("Auth error:", e));
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById("adminDiv").classList.remove("hidden");
+        startListening();
+      }
+    });
+
+    // Add new buy transaction
+    document.getElementById("addForm").onsubmit = e => {
+      e.preventDefault();
+      const txRef = db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push();
+      txRef.set({
+        sym: document.getElementById("sym").value.toUpperCase(),
+        qty: Number(document.getElementById("qty").value),
+        p_price: Number(document.getElementById("bPrice").value),
+        p_date: Math.floor(new Date(document.getElementById("bDate").value).getTime()/1000)
+      });
+      e.target.reset();
+    };
+
+    // Render transactions
+    const tableBody = document.querySelector("#txTable tbody");
+    function startListening() {
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`)
+        .on("value", snap => {
+          tableBody.innerHTML = "";
+          const data = snap.val() || {};
+          Object.entries(data).forEach(([id, tx]) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${tx.sym}</td>
+              <td>${tx.qty}</td>
+              <td>$${tx.p_price.toFixed(2)}</td>
+              <td>${new Date(tx.p_date*1000).toLocaleDateString()}</td>
+              <td>${tx.s_price? `$${tx.s_price.toFixed(2)}` : "-"}</td>
+              <td>${tx.s_date? new Date(tx.s_date*1000).toLocaleDateString() : "-"}</td>
+              <td>${tx.s_price ? "" : "<span class='btn-sell'>Sell</span>"}</td>
+            `;
+            if (!tx.s_price) {
+              row.querySelector(".btn-sell").onclick = () => promptSell(id);
+            }
+            tableBody.appendChild(row);
+          });
+        });
+    }
+
+    // Prompt & record a sale
+    function promptSell(txId) {
+      const price = prompt("Enter Sell Price:");
+      const date  = prompt("Enter Sell Date (YYYY-MM-DD):");
+      if (!price || !date) return;
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${txId}`).update({
+        s_price: Number(price),
+        s_date: Math.floor(new Date(date).getTime()/1000)
+      });
+    }
+  </script>
+</body>
+</html>
