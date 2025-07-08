@@ -90,60 +90,99 @@
     const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
     let currentSellId = null;
 
-    // Show inline errors
     function showError(msg) {
       const el = document.getElementById('errorMsg'); el.textContent = msg; el.classList.remove('hidden');
     }
 
-    // Parse date yyyy-mm-dd without timezone shift
     function parseLocalDate(s) {
-      const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d);
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d);
     }
 
-    // Anonymous auth
     auth.signInAnonymously().catch(e => showError('Auth failed: ' + e.message));
-    auth.onAuthStateChanged(user => { if (user) { document.getElementById('adminDiv').classList.remove('hidden'); startListening(); }});
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('adminDiv').classList.remove('hidden');
+        startListening();
+      }
+    });
 
-    // Quick import handler
     document.getElementById('importBtn').onclick = () => {
       const txt = document.getElementById('quickInput').value.trim();
       const m = txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
       if (!m) return alert('Couldn’t parse action, qty, or symbol');
-      const [, action, qtyStr, symRaw] = m; const sym = symRaw.toUpperCase(); const qty = parseInt(qtyStr, 10);
-      let dt; const dateVal = document.getElementById('importDate').value;
+      const [, action, qtyStr, symRaw] = m;
+      const sym = symRaw.toUpperCase();
+      const qty = parseInt(qtyStr, 10);
+      let dt;
+      const dateVal = document.getElementById('importDate').value;
       dt = dateVal ? parseLocalDate(dateVal) : new Date();
-      const tm = txt.match(/(\d{2}:\d{2}:\d{2})/); if (tm) { const [h, mi, s] = tm[1].split(':').map(Number); dt.setHours(h, mi, s); }
+      const tm = txt.match(/(\d{2}:\d{2}:\d{2})/);
+      if (tm) {
+        const [h, mi, s] = tm[1].split(':').map(Number);
+        dt.setHours(h, mi, s);
+      }
       const ts = Math.floor(dt.getTime() / 1000);
       const rest = txt.slice(txt.toUpperCase().indexOf(sym) + sym.length);
       const pm = rest.match(/(-?\d+(?:\.\d+)?)/);
-      if (!pm) return alert('Couldn’t parse price'); const price = parseFloat(pm[1]);
+      if (!pm) return alert('Couldn’t parse price');
+      const price = parseFloat(pm[1]);
+
       if (action.toUpperCase() === 'BOUGHT') {
         db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({ sym, qty, p_price: price, p_date: ts });
       } else {
-        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).orderByChild('sym').equalTo(sym).once('value').then(snap => {
-          const data = snap.val() || {};
-          const entry = Object.entries(data).find(([, tx]) => !tx.s_price);
-          if (!entry) return alert('No open position for ' + sym);
-          const id = entry[0];
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).update({ s_price: price, s_date: ts });
-        });
+        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`)
+          .orderByChild('sym').equalTo(sym).once('value')
+          .then(snap => {
+            const data = snap.val() || {};
+            const entry = Object.entries(data).find(([, tx]) => !tx.s_price);
+            if (!entry) return alert('No open position for ' + sym);
+            const id = entry[0];
+            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).update({ s_price: price, s_date: ts });
+          });
       }
-      document.getElementById('quickInput').value = ''; document.getElementById('importDate').value = '';
+      document.getElementById('quickInput').value = '';
+      document.getElementById('importDate').value = '';
     };
 
-    // Manual add handler
-    document.getElementById('addForm').onsubmit = e => { e.preventDefault(); const dt = parseLocalDate(document.getElementById('bDate').value); const ts = Math.floor(dt.getTime() / 1000);
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({ sym: document.getElementById('sym').value.toUpperCase(), qty: Number(document.getElementById('qty').value), p_price: Number(document.getElementById('bPrice').value), p_date: ts }); e.target.reset(); };
+    document.getElementById('addForm').onsubmit = e => {
+      e.preventDefault();
+      const dt = parseLocalDate(document.getElementById('bDate').value);
+      const ts = Math.floor(dt.getTime() / 1000);
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({
+        sym: document.getElementById('sym').value.toUpperCase(),
+        qty: Number(document.getElementById('qty').value),
+        p_price: Number(document.getElementById('bPrice').value),
+        p_date: ts
+      });
+      e.target.reset();
+    };
 
-    // Sell form handlers
-    const sellForm = document.getElementById('sellTransactionForm'); if (sellForm) {
-      sellForm.onsubmit = e => { e.preventDefault(); const price = Number(document.getElementById('sPrice').value); const dateVal = document.getElementById('sDate').value; if (!price || !dateVal || !currentSellId) return; const dt = parseLocalDate(dateVal); const ts = Math.floor(dt.getTime()/1000); db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price: price, s_date: ts }); hideSellForm(); };
+    const sellForm = document.getElementById('sellTransactionForm');
+    if (sellForm) {
+      sellForm.onsubmit = e => {
+        e.preventDefault();
+        const price = Number(document.getElementById('sPrice').value);
+        const dateVal = document.getElementById('sDate').value;
+        if (!price || !dateVal || !currentSellId) return;
+        const dt = parseLocalDate(dateVal);
+        const ts = Math.floor(dt.getTime() / 1000);
+        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price: price, s_date: ts });
+        hideSellForm();
+      };
       document.getElementById('cancelSellBtn').onclick = hideSellForm;
     }
-    function showSellForm(id) { currentSellId = id; document.getElementById('sellForm').classList.remove('hidden'); document.getElementById('sDate').value = new Date().toISOString().split('T')[0]; }
-    function hideSellForm() { currentSellId = null; document.getElementById('sellForm').classList.add('hidden'); if (sellForm) sellForm.reset(); }
+    function showSellForm(id) {
+      currentSellId = id;
+      document.getElementById('sellForm').classList.remove('hidden');
+      document.getElementById('sDate').value = new Date().toISOString().split('T')[0];
+    }
+    function hideSellForm() {
+      currentSellId = null;
+      document.getElementById('sellForm').classList.add('hidden');
+      if (sellForm) sellForm.reset();
+    }
 
-    // Start listening & render table
     function startListening() {
       const tbody = document.querySelector('#txTable tbody');
       db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).on('value', snap => {
@@ -155,8 +194,13 @@
           const sellDate = tx.s_date ? new Date(tx.s_date * 1000).toLocaleDateString('en-US') : '-';
           const pl = tx.s_price ? (tx.s_price - tx.p_price) * tx.qty : 0;
           const actions = tx.s_price ? `<span class='btn-delete'>Delete</span>` : `<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
-          tr.innerHTML = `<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price ? `$${tx.s_price.toFixed(2)}` : '-'}</td><td>${sellDate}</td><td>${tx.s_price ? '$' + pl.toFixed(2) : '-'}</td><td>${actions}</td>`;
-          tr.classList.add(tx.s_price ? (pl >= 0 ? 'gain' : 'loss') : '');
+          tr.innerHTML = `<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price ? `$${tx.s_price.toFixed(2)}` : '-'}</td><td>${sellDate}</td><td>${tx.s_price ? '$'+pl.toFixed(2) : '-'}</td><td>${actions}</td>`;
+          // color row green for gain, red for loss
+          if (tx.s_price !== undefined) {
+            const cls = pl >= 0 ? 'gain' : 'loss';
+            tr.classList.add(cls);
+          }
+          if (tx.s_price) tr.classList.add(pl >= 0 ? 'gain' : 'loss');
           tbody.appendChild(tr);
           if (!tx.s_price) tr.querySelector('.btn-sell').onclick = () => showSellForm(id);
           tr.querySelector('.btn-delete').onclick = () => { if (confirm('Delete this transaction?')) db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove(); };
