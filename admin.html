@@ -9,32 +9,54 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
-    table { width: 100%; border-collapse: collapse; margin-top:1rem; }
-    th, td { border:1px solid #ccc; padding:8px; text-align:center; }
-    th { background:#f0f0f0; }
-    form { margin-top:1rem; }
-    label { display:inline-block; width:120px; }
-    input, button { padding:4px 8px; margin:4px; }
-    .hidden { display:none; }
-    .btn-sell { color:#c0392b; cursor:pointer; margin-right:8px; }
-    .btn-delete { color:#e74c3c; cursor:pointer; }
+    .hidden { display: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f0f0f0; }
+    form { margin-top: 1rem; }
+    label { display: inline-block; width: 120px; }
+    input, textarea, button { padding: 4px 8px; margin: 4px; }
+    textarea { width: 100%; height: 3rem; font-family: inherit; }
+    .btn-sell { color: #c0392b; cursor: pointer; margin-right: 8px; }
+    .btn-delete { color: #e74c3c; cursor: pointer; }
+    #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
+    .error { color: #e74c3c; font-weight: bold; margin-top: 1rem; }
   </style>
 </head>
 <body>
-
   <h1>Portfolio Admin</h1>
-
-  <!-- ADMIN UI (will show after anonymous auth) -->
+  <div id="errorMsg" class="error hidden"></div>
   <div id="adminDiv" class="hidden">
+
+    <!-- Quick Import IB Trade -->
+    <h2>Quick Import IB Trade</h2>
+    <div id="quickImport">
+      <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br>
+      <button id="importBtn">Import Trade</button>
+    </div>
+
+    <!-- Manual Entry -->
     <h2>Add New Position</h2>
     <form id="addForm">
-      <label>Symbol:</label><input id="sym" required><br>
+      <label>Symbol:</label><input id="sym" type="text" required><br>
       <label>Qty:</label><input type="number" id="qty" required><br>
       <label>Buy Price:</label><input type="number" step="0.01" id="bPrice" required><br>
       <label>Date:</label><input type="date" id="bDate" required><br>
       <button type="submit">Add Buy</button>
     </form>
 
+    <!-- Sell Form -->
+    <div id="sellForm" class="hidden">
+      <h2>Sell Position</h2>
+      <form id="sellTransactionForm">
+        <label>Sell Price:</label><input type="number" step="0.01" id="sPrice" required><br>
+        <label>Sell Date:</label><input type="date" id="sDate" required><br>
+        <button type="submit">Save Sale</button>
+        <button type="button" id="cancelSellBtn">Cancel</button>
+      </form>
+    </div>
+
+    <!-- Transactions Table -->
     <h2>Open & Closed Transactions</h2>
     <table id="txTable">
       <thead>
@@ -47,9 +69,8 @@
     </table>
   </div>
 
-  <!-- Firebase Config + Main Script -->
   <script>
-    // Initialize Firebase
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
       authDomain: "stock-portfolio-tracker-aefdf.firebaseapp.com",
@@ -64,76 +85,121 @@
     const db = firebase.database();
     const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
     const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
+    let currentSellId = null;
 
-    // Anonymous authentication
-    auth.signInAnonymously().catch(e => console.error("Auth error:", e));
+    // Show inline errors
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // Parse date yyyy-mm-dd without timezone shift
+    function parseLocalDate(s) {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    // Anonymous auth
+    auth.signInAnonymously().catch(e => showError('Auth failed: ' + e.message));
     auth.onAuthStateChanged(user => {
       if (user) {
-        document.getElementById("adminDiv").classList.remove("hidden");
+        document.getElementById('adminDiv').classList.remove('hidden');
         startListening();
       }
     });
 
-    // Add new buy transaction
-    document.getElementById("addForm").onsubmit = e => {
+    // Quick import handler
+    document.getElementById('importBtn').onclick = () => {
+      const txt = document.getElementById('quickInput').value.trim();
+      const m = txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
+      if (!m) return alert('Couldn’t parse action, qty, or symbol');
+      const [, action, qtyStr, symRaw] = m;
+      const sym = symRaw.toUpperCase();
+      const qty = parseInt(qtyStr, 10);
+      const rest = txt.slice(txt.toUpperCase().indexOf(sym) + sym.length);
+      const pm = rest.match(/(-?\d+(?:\.\d+)?)/);
+      if (!pm) return alert('Couldn’t parse price');
+      const price = parseFloat(pm[1]);
+      let dt = new Date();
+      const tm = txt.match(/(\d{2}:\d{2}:\d{2})/);
+      if (tm) { const [h, mi, s] = tm[1].split(':').map(Number); dt.setHours(h, mi, s); }
+      const ts = Math.floor(dt.getTime() / 1000);
+
+      if (action.toUpperCase() === 'BOUGHT') {
+        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({ sym, qty, p_price: price, p_date: ts });
+      } else {
+        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`)
+          .orderByChild('sym').equalTo(sym).once('value')
+          .then(snap => {
+            const data = snap.val() || {};
+            const entry = Object.entries(data).find(([, tx]) => !tx.s_price);
+            if (!entry) return alert('No open position for ' + sym);
+            const id = entry[0];
+            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).update({ s_price: price, s_date: ts });
+          });
+      }
+      document.getElementById('quickInput').value = '';
+    };
+
+    // Manual add handler
+    document.getElementById('addForm').onsubmit = e => {
       e.preventDefault();
-      const txRef = db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push();
-      txRef.set({
-        sym: document.getElementById("sym").value.toUpperCase(),
-        qty: Number(document.getElementById("qty").value),
-        p_price: Number(document.getElementById("bPrice").value),
-        p_date: Math.floor(new Date(document.getElementById("bDate").value).getTime()/1000)
+      const dt = parseLocalDate(document.getElementById('bDate').value);
+      const ts = Math.floor(dt.getTime() / 1000);
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({
+        sym: document.getElementById('sym').value.toUpperCase(),
+        qty: Number(document.getElementById('qty').value),
+        p_price: Number(document.getElementById('bPrice').value),
+        p_date: ts
       });
       e.target.reset();
     };
 
-    // Render transactions
-    const tableBody = document.querySelector("#txTable tbody");
-    function startListening() {
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`)
-        .on("value", snap => {
-          tableBody.innerHTML = "";
-          const data = snap.val() || {};
-          Object.entries(data).forEach(([id, tx]) => {
-            const row = document.createElement("tr");
-            let actions = "";
-            if (!tx.s_price) {
-              actions = `<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
-            } else {
-              actions = `<span class='btn-delete'>Delete</span>`;
-            }
-            row.innerHTML = `
-              <td>${tx.sym}</td>
-              <td>${tx.qty}</td>
-              <td>$${tx.p_price.toFixed(2)}</td>
-              <td>${new Date(tx.p_date*1000).toLocaleDateString()}</td>
-              <td>${tx.s_price? `$${tx.s_price.toFixed(2)}` : "-"}</td>
-              <td>${tx.s_date? new Date(tx.s_date*1000).toLocaleDateString() : "-"}</td>
-              <td>${actions}</td>
-            `;
-            tableBody.appendChild(row);
-            // Sell handler
-            if (!tx.s_price) {
-              row.querySelector('.btn-sell').onclick = () => promptSell(id);
-            }
-            // Delete handler
-            row.querySelector('.btn-delete').onclick = () => {
-              if (confirm('Delete this transaction?')) {
-                db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove();
-              }
-            };
-          });
-        });
+    // Sell form handlers
+    const sellForm = document.getElementById('sellTransactionForm');
+    if (sellForm) {
+      sellForm.onsubmit = e => {
+        e.preventDefault();
+        const price = Number(document.getElementById('sPrice').value);
+        const dateVal = document.getElementById('sDate').value;
+        if (!price || !dateVal || !currentSellId) return;
+        const dt = parseLocalDate(dateVal);
+        const ts = Math.floor(dt.getTime() / 1000);
+        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price: price, s_date: ts });
+        hideSellForm();
+      };
+      document.getElementById('cancelSellBtn').onclick = hideSellForm;
+    }
+    function showSellForm(id) {
+      currentSellId = id;
+      document.getElementById('sellForm').classList.remove('hidden');
+      document.getElementById('sDate').value = new Date().toISOString().split('T')[0];
+    }
+    function hideSellForm() {
+      currentSellId = null;
+      document.getElementById('sellForm').classList.add('hidden');
+      if (sellForm) sellForm.reset();
     }
 
-    // Prompt & record a sale
-    function promptSell(txId) {
-      const price = prompt("Enter Sell Price:");
-      const date  = prompt("Enter Sell Date (YYYY-MM-DD):");
-      if (!price || !date) return;
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${txId}`).update({
-        s_price: Number(price),
-        s_date: Math.floor(new Date(date).getTime()/1000)
+    // Start listening & render table
+    function startListening() {
+      const tbody = document.querySelector('#txTable tbody');
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).on('value', snap => {
+        tbody.innerHTML = '';
+        const data = snap.val() || {};
+        Object.entries(data).forEach(([id, tx]) => {
+          const tr = document.createElement('tr');
+          const buyDate = new Date(tx.p_date * 1000).toLocaleDateString('en-US');
+          const sellDate = tx.s_date ? new Date(tx.s_date * 1000).toLocaleDateString('en-US') : '-';
+          const actions = tx.s_price
+            ? `<span class='btn-delete'>Delete</span>`
+            : `<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
+          tr.innerHTML = `<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price ? `$${tx.s_price.toFixed(2)}` : '-'}</td><td>${sellDate}</td><td>${actions}</td>`;
+          tbody.appendChild(tr);
+          if (!tx.s_price) tr.querySelector('.btn-sell').onclick = () => showSellForm(id);
+          tr.querySelector('.btn-delete').onclick = () => { if (confirm('Delete this transaction?')) db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove(); };
+        });
       });
     }
   </script>
