@@ -63,7 +63,7 @@
       <thead>
         <tr>
           <th>Symbol</th><th>Qty</th><th>Buy Price</th><th>Buy Date</th>
-          <th>Sell Price</th><th>Sell Date</th><th>Action</th>
+          <th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -202,7 +202,7 @@
           const actions = tx.s_price
             ? `<span class='btn-delete'>Delete</span>`
             : `<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
-          tr.innerHTML = `<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price ? `$${tx.s_price.toFixed(2)}` : '-'}</td><td>${sellDate}</td><td>${actions}</td>`;
+          tr.innerHTML = `<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price ? `$${tx.s_price.toFixed(2)}` : '-'}</td><td>${sellDate}</td><td>${tx.s_price ? '$' + ((tx.s_price - tx.p_price) * tx.qty).toFixed(2) : '-'}</td><td>${actions}</td>`;
           tbody.appendChild(tr);
           if (!tx.s_price) tr.querySelector('.btn-sell').onclick = () => showSellForm(id);
           tr.querySelector('.btn-delete').onclick = () => { if (confirm('Delete this transaction?')) db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove(); };
