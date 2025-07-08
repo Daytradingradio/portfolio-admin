@@ -32,6 +32,7 @@
     <h2>Quick Import IB Trade</h2>
     <div id="quickImport">
       <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br>
+      <label>Trade Date:</label><input id="importDate" type="date"><br>
       <button id="importBtn">Import Trade</button>
     </div>
 
@@ -117,14 +118,19 @@
       const [, action, qtyStr, symRaw] = m;
       const sym = symRaw.toUpperCase();
       const qty = parseInt(qtyStr, 10);
+      // date: from importDate or default to today
+      let dt;
+      const dateVal = document.getElementById('importDate').value;
+      if (dateVal) dt = parseLocalDate(dateVal);
+      else dt = new Date();
+      // override time if provided in IB string
+      const tm = txt.match(/(\d{2}:\d{2}:\d{2})/);
+      if (tm) { const [h, mi, s] = tm[1].split(':').map(Number); dt.setHours(h, mi, s); }
+      const ts = Math.floor(dt.getTime() / 1000);
       const rest = txt.slice(txt.toUpperCase().indexOf(sym) + sym.length);
       const pm = rest.match(/(-?\d+(?:\.\d+)?)/);
       if (!pm) return alert('Couldn’t parse price');
       const price = parseFloat(pm[1]);
-      let dt = new Date();
-      const tm = txt.match(/(\d{2}:\d{2}:\d{2})/);
-      if (tm) { const [h, mi, s] = tm[1].split(':').map(Number); dt.setHours(h, mi, s); }
-      const ts = Math.floor(dt.getTime() / 1000);
 
       if (action.toUpperCase() === 'BOUGHT') {
         db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({ sym, qty, p_price: price, p_date: ts });
@@ -140,6 +146,7 @@
           });
       }
       document.getElementById('quickInput').value = '';
+      document.getElementById('importDate').value = '';
     };
 
     // Manual add handler
