@@ -49,6 +49,7 @@
     <div id="sellForm" class="hidden">
       <h2>Sell Position</h2>
       <form id="sellTransactionForm">
+        <label>Sell Qty:</label><input type="number" id="sQty" required><br>
         <label>Sell Price:</label><input type="number" step="0.01" id="sPrice" required><br>
         <label>Sell Date:</label><input type="date" id="sDate" required><br>
         <button type="submit">Save Sale</button>
@@ -103,7 +104,15 @@
       else{ // sell
         db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
           const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
-          if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ s_price:price,s_date:ts });
+          if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
+          if(qty > tx2.qty) return alert('Sell qty exceeds held');
+          if(qty === tx2.qty){
+            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ s_price:price,s_date:ts });
+          } else {
+            const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
+            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push(closedTx);
+            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ qty: tx2.qty - qty });
+          }
         });
       }
       document.getElementById('quickInput').value='';document.getElementById('importDate').value='';
@@ -115,8 +124,31 @@
       e.target.reset();
     };
     // Sell form
-    const sellForm=document.getElementById('sellTransactionForm');if(sellForm){sellForm.onsubmit=e=>{e.preventDefault();const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value; if(!price||!dateVal||!currentSellId)return;const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price:price,s_date:ts });hideSellForm();};document.getElementById('cancelSellBtn').onclick=hideSellForm;}
-    function showSellForm(id){currentSellId=id;document.getElementById('sellForm').classList.remove('hidden');document.getElementById('sDate').value=new Date().toISOString().split('T')[0];}
+    const sellForm=document.getElementById('sellTransactionForm');if(sellForm){sellForm.onsubmit=e=>{e.preventDefault();
+      const sQty = Number(document.getElementById('sQty').value);
+      const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value; 
+      if(!sQty || !price||!dateVal||!currentSellId)return;
+      const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).once('value').then(snap => {
+        const tx = snap.val();
+        if(!tx || tx.s_price) return alert('Invalid position');
+        if(sQty > tx.qty) return alert('Sell qty exceeds held');
+        if(sQty === tx.qty){
+          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price:price,s_date:ts });
+        } else {
+          const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
+          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push(closedTx);
+          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ qty: tx.qty - sQty });
+        }
+        hideSellForm();
+      });
+    };document.getElementById('cancelSellBtn').onclick=hideSellForm;}
+    function showSellForm(id){currentSellId=id;
+      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).once('value').then(snap => {
+        const tx = snap.val();
+        document.getElementById('sQty').value = tx.qty;
+      });
+      document.getElementById('sellForm').classList.remove('hidden');document.getElementById('sDate').value=new Date().toISOString().split('T')[0];}
     function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
     // Render
     function startListening(){
