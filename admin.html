@@ -66,31 +66,59 @@
     </table>
   </div>
   <script>
-    const firebaseConfig = { apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E", authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com", databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com", projectId:"stock-portfolio-tracker-aefdf", storageBucket:"stock-portfolio-tracker-aefdf.appspot.com", messagingSenderId:"26263489272", appId:"1:26263489272:web:fe7bc7af204fee016b490d" };
+    const firebaseConfig = {
+      apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
+      authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com",
+      databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
+      projectId:"stock-portfolio-tracker-aefdf",
+      storageBucket:"stock-portfolio-tracker-aefdf.appspot.com",
+      messagingSenderId:"26263489272",
+      appId:"1:26263489272:web:fe7bc7af204fee016b490d"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth(), db = firebase.database();
-    const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572", PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
+
+    // ---- Change here: use /users/{uid}/portfolios/{id}/transactions ----
+    const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
+    const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
+    const TX_PATH = `users/${OWNER}/portfolios/${PORTFOLIO}/transactions`;
+
     let currentSellId = null;
-    function showError(msg){const el=document.getElementById('errorMsg');el.textContent=msg;el.classList.remove('hidden');}
-    function parseLocalDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+    function showError(msg){
+      const el=document.getElementById('errorMsg');
+      el.textContent=msg;
+      el.classList.remove('hidden');
+    }
+    function parseLocalDate(s){
+      const [y,m,d]=s.split('-').map(Number);
+      return new Date(y,m-1,d);
+    }
+
     auth.signInAnonymously().catch(e=>showError('Auth failed: '+e.message));
-    auth.onAuthStateChanged(user=>{if(user){document.getElementById('adminDiv').classList.remove('hidden');startListening();}});
-    // Combine or push buy
+    auth.onAuthStateChanged(user=>{
+      if(user){
+        document.getElementById('adminDiv').classList.remove('hidden');
+        startListening();
+      }
+    });
+
+    // ---- BUY ----
     function handleBuy(sym,qty,price,ts){
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
+      db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
         const data=snap.val()||{};
         const entry=Object.entries(data).find(([,tx])=>!tx.s_price);
         if(entry){
           const [id,tx]=entry;
           const totalQty=tx.qty+qty;
           const avgPrice=(tx.qty*tx.p_price+qty*price)/totalQty;
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
+          db.ref(`${TX_PATH}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
         } else {
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({ sym,qty,p_price:price,p_date:ts });
+          db.ref(TX_PATH).push({ sym,qty,p_price:price,p_date:ts });
         }
       });
     }
-    // Quick import
+
+    // ---- QUICK IMPORT ----
     document.getElementById('importBtn').onclick=()=>{
       const txt=document.getElementById('quickInput').value.trim();
       const m=txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
@@ -100,60 +128,91 @@
       const tm=txt.match(/(\d{2}:\d{2}:\d{2})/);if(tm){const[a,b,c]=tm[1].split(':').map(Number);dt.setHours(a,b,c);}const ts=Math.floor(dt.getTime()/1000);
       const rest=txt.slice(txt.toUpperCase().indexOf(sym)+sym.length);
       const pm=rest.match(/(-?\d+(?:\.\d+)?)/);if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
-      if(action.toUpperCase()==='BOUGHT')handleBuy(sym,qty,price,ts);
-      else{ // sell
-        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
+
+      if(action.toUpperCase()==='BOUGHT') handleBuy(sym,qty,price,ts);
+      else {
+        db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
           const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
           if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
           if(qty > tx2.qty) return alert('Sell qty exceeds held');
           if(qty === tx2.qty){
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ s_price:price,s_date:ts });
+            db.ref(`${TX_PATH}/${id2}`).update({ s_price:price,s_date:ts });
           } else {
             const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push(closedTx);
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ qty: tx2.qty - qty });
+            db.ref(TX_PATH).push(closedTx);
+            db.ref(`${TX_PATH}/${id2}`).update({ qty: tx2.qty - qty });
           }
         });
       }
-      document.getElementById('quickInput').value='';document.getElementById('importDate').value='';
+      document.getElementById('quickInput').value='';
+      document.getElementById('importDate').value='';
     };
-    // Manual add
+
+    // ---- MANUAL ADD ----
     document.getElementById('addForm').onsubmit=e=>{
-      e.preventDefault();const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
+      e.preventDefault();
+      const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
       handleBuy(document.getElementById('sym').value.toUpperCase(),Number(document.getElementById('qty').value),Number(document.getElementById('bPrice').value),ts);
       e.target.reset();
     };
-    // Sell form
-    const sellForm=document.getElementById('sellTransactionForm');if(sellForm){sellForm.onsubmit=e=>{e.preventDefault();
-      const sQty = Number(document.getElementById('sQty').value);
-      const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value; 
-      if(!sQty || !price||!dateVal||!currentSellId)return;
-      const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).once('value').then(snap => {
-        const tx = snap.val();
-        if(!tx || tx.s_price) return alert('Invalid position');
-        if(sQty > tx.qty) return alert('Sell qty exceeds held');
-        if(sQty === tx.qty){
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price:price,s_date:ts });
-        } else {
-          const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push(closedTx);
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ qty: tx.qty - sQty });
-        }
-        hideSellForm();
-      });
-    };document.getElementById('cancelSellBtn').onclick=hideSellForm;}
-    function showSellForm(id){currentSellId=id;
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).once('value').then(snap => {
+
+    // ---- SELL FORM ----
+    const sellForm=document.getElementById('sellTransactionForm');
+    if(sellForm){
+      sellForm.onsubmit=e=>{
+        e.preventDefault();
+        const sQty = Number(document.getElementById('sQty').value);
+        const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value;
+        if(!sQty || !price||!dateVal||!currentSellId)return;
+        const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
+        db.ref(`${TX_PATH}/${currentSellId}`).once('value').then(snap => {
+          const tx = snap.val();
+          if(!tx || tx.s_price) return alert('Invalid position');
+          if(sQty > tx.qty) return alert('Sell qty exceeds held');
+          if(sQty === tx.qty){
+            db.ref(`${TX_PATH}/${currentSellId}`).update({ s_price:price,s_date:ts });
+          } else {
+            const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
+            db.ref(TX_PATH).push(closedTx);
+            db.ref(`${TX_PATH}/${currentSellId}`).update({ qty: tx.qty - sQty });
+          }
+          hideSellForm();
+        });
+      };
+      document.getElementById('cancelSellBtn').onclick=hideSellForm;
+    }
+
+    function showSellForm(id){
+      currentSellId=id;
+      db.ref(`${TX_PATH}/${id}`).once('value').then(snap => {
         const tx = snap.val();
         document.getElementById('sQty').value = tx.qty;
       });
-      document.getElementById('sellForm').classList.remove('hidden');document.getElementById('sDate').value=new Date().toISOString().split('T')[0];}
+      document.getElementById('sellForm').classList.remove('hidden');
+      document.getElementById('sDate').value=new Date().toISOString().split('T')[0];
+    }
     function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
-    // Render
+
+    // ---- RENDER ----
     function startListening(){
       const tbody=document.querySelector('#txTable tbody');
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).on('value',snap=>{tbody.innerHTML='';const data=snap.val()||{};Object.entries(data).forEach(([id,tx])=>{const tr=document.createElement('tr');const buyDate=new Date(tx.p_date*1000).toLocaleDateString('en-US');const sellDate=tx.s_date?new Date(tx.s_date*1000).toLocaleDateString('en-US'):'-';const pl=tx.s_price?(tx.s_price-tx.p_price)*tx.qty:0;const actions=tx.s_price?`<span class='btn-delete'>Delete</span>`:`<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;tr.innerHTML=`<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price?`$${tx.s_price.toFixed(2)}`:'-'}</td><td>${sellDate}</td><td>${tx.s_price?`$${pl.toFixed(2)}`:'-'}</td><td>${actions}</td>`;if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}tbody.appendChild(tr);if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove();};});});}
+      db.ref(TX_PATH).on('value',snap=>{
+        tbody.innerHTML='';
+        const data=snap.val()||{};
+        Object.entries(data).forEach(([id,tx])=>{
+          const tr=document.createElement('tr');
+          const buyDate=new Date(tx.p_date*1000).toLocaleDateString('en-US');
+          const sellDate=tx.s_date?new Date(tx.s_date*1000).toLocaleDateString('en-US'):'-';
+          const pl=tx.s_price?(tx.s_price-tx.p_price)*tx.qty:0;
+          const actions=tx.s_price?`<span class='btn-delete'>Delete</span>`:`<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
+          tr.innerHTML=`<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price?`$${tx.s_price.toFixed(2)}`:'-'}</td><td>${sellDate}</td><td>${tx.s_price?`$${pl.toFixed(2)}`:'-'}</td><td>${actions}</td>`;
+          if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}
+          tbody.appendChild(tr);
+          if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);
+          tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`${TX_PATH}/${id}`).remove();};
+        });
+      });
+    }
   </script>
 </body>
 </html>
