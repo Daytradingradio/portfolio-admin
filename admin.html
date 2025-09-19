@@ -1,218 +1,417 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Portfolio Admin</title>
+
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
   <style>
-    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
+    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 900px; margin: auto; }
+    h1 { margin-bottom: 0.25rem; }
+    #status { font-size: .95rem; color: #555; margin-bottom: .75rem; }
     .hidden { display: none; }
+    .banner { padding: .5rem .75rem; border: 1px solid #ccc; background: #fffbe6; color: #7a5b00; border-radius: 4px; margin: .5rem 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #f0f0f0; }
+    th { background: #f7f7f7; }
     tr.gain { background-color: #e8f5e9; }
     tr.loss { background-color: #fdecea; }
     form { margin-top: 1rem; }
     label { display: inline-block; width: 120px; }
     input, textarea, button { padding: 4px 8px; margin: 4px; }
     textarea { width: 100%; height: 3rem; font-family: inherit; }
+    #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; border-radius: 4px; }
+    .btn { cursor: pointer; }
+    .btn[disabled] { opacity: .5; cursor: not-allowed; }
     .btn-sell { color: #c0392b; cursor: pointer; margin-right: 8px; }
     .btn-delete { color: #e74c3c; cursor: pointer; }
-    #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
-    .error { color: #e74c3c; font-weight: bold; margin-top: 1rem; }
+    .error { color: #e74c3c; font-weight: bold; margin: .5rem 0; }
   </style>
 </head>
 <body>
   <h1>Portfolio Admin</h1>
+  <div id="status">Initializing…</div>
+  <div id="modeBanner" class="banner hidden">Read-only mode: not signed in. You can view data but cannot write.</div>
   <div id="errorMsg" class="error hidden"></div>
-  <div id="adminDiv" class="hidden">
-    <!-- Quick Import IB Trade -->
-    <h2>Quick Import IB Trade</h2>
-    <div id="quickImport">
-      <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br>
-      <label>Trade Date:</label><input id="importDate" type="date"><br>
-      <button id="importBtn">Import Trade</button>
-    </div>
-    <!-- Manual Entry -->
-    <h2>Add New Position</h2>
-    <form id="addForm">
-      <label>Symbol:</label><input id="sym" type="text" required><br>
-      <label>Qty:</label><input type="number" id="qty" required><br>
-      <label>Buy Price:</label><input type="number" step="0.01" id="bPrice" required><br>
-      <label>Date:</label><input type="date" id="bDate" required><br>
-      <button type="submit">Add Buy</button>
-    </form>
-    <!-- Sell Form -->
-    <div id="sellForm" class="hidden">
-      <h2>Sell Position</h2>
-      <form id="sellTransactionForm">
-        <label>Sell Qty:</label><input type="number" id="sQty" required><br>
-        <label>Sell Price:</label><input type="number" step="0.01" id="sPrice" required><br>
-        <label>Sell Date:</label><input type="date" id="sDate" required><br>
-        <button type="submit">Save Sale</button>
-        <button type="button" id="cancelSellBtn">Cancel</button>
-      </form>
-    </div>
-    <!-- Transactions Table -->
-    <h2>Open & Closed Transactions</h2>
-    <table id="txTable">
-      <thead>
-        <tr><th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th><th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-  <script>
-    const firebaseConfig = {
-      apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
-      authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com",
-      databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
-      projectId:"stock-portfolio-tracker-aefdf",
-      storageBucket:"stock-portfolio-tracker-aefdf.appspot.com",
-      messagingSenderId:"26263489272",
-      appId:"1:26263489272:web:fe7bc7af204fee016b490d"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth(), db = firebase.database();
 
-    // ---- Change here: use /users/{uid}/portfolios/{id}/transactions ----
+  <!-- Quick Import -->
+  <h2>Quick Import IB Trade</h2>
+  <div id="quickImport">
+    <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br />
+    <label>Trade Date:</label><input id="importDate" type="date" />
+    <button id="importBtn" class="btn">Import Trade</button>
+  </div>
+
+  <!-- Manual Entry -->
+  <h2>Add New Position</h2>
+  <form id="addForm">
+    <label>Symbol:</label><input id="sym" type="text" required />
+    <label>Qty:</label><input id="qty" type="number" required />
+    <label>Buy Price:</label><input id="bPrice" type="number" step="0.01" required />
+    <label>Date:</label><input id="bDate" type="date" required />
+    <button type="submit" id="addBtn" class="btn">Add Buy</button>
+  </form>
+
+  <!-- Sell Form -->
+  <div id="sellForm" class="hidden">
+    <h2>Sell Position</h2>
+    <form id="sellTransactionForm">
+      <label>Sell Qty:</label><input type="number" id="sQty" required />
+      <label>Sell Price:</label><input type="number" step="0.01" id="sPrice" required />
+      <label>Sell Date:</label><input type="date" id="sDate" required />
+      <button type="submit" id="saveSaleBtn" class="btn">Save Sale</button>
+      <button type="button" id="cancelSellBtn" class="btn">Cancel</button>
+    </form>
+  </div>
+
+  <!-- Transactions Table -->
+  <h2>Open & Closed Transactions</h2>
+  <table id="txTable">
+    <thead>
+      <tr>
+        <th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th>
+        <th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    // ---- CONFIG ----
+    const firebaseConfig = {
+      apiKey: "AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
+      authDomain: "stock-portfolio-tracker-aefdf.firebaseapp.com",
+      databaseURL: "https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
+      projectId: "stock-portfolio-tracker-aefdf",
+      storageBucket: "stock-portfolio-tracker-aefdf.appspot.com",
+      messagingSenderId: "26263489272",
+      appId: "1:26263489272:web:fe7bc7af204fee016b490d"
+    };
+
+    // OWNER + PORTFOLIO IDs used everywhere
     const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
     const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
-    const TX_PATH = `users/${OWNER}/portfolios/${PORTFOLIO}/transactions`;
 
-    let currentSellId = null;
-    function showError(msg){
-      const el=document.getElementById('errorMsg');
-      el.textContent=msg;
-      el.classList.remove('hidden');
-    }
-    function parseLocalDate(s){
-      const [y,m,d]=s.split('-').map(Number);
-      return new Date(y,m-1,d);
+    // ---- UTIL ----
+    const $ = (id) => document.getElementById(id);
+    const show = (el) => el.classList.remove("hidden");
+    const hide = (el) => el.classList.add("hidden");
+    const fmtMoney = (n) => Number.isFinite(n) ? "$" + n.toFixed(2) : "-";
+    const parseLocalDate = (s) => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+
+    function setStatus(msg) { $("status").textContent = msg; }
+    function showError(msg) { const el = $("errorMsg"); el.textContent = msg; show(el); }
+
+    // ---- FIREBASE ----
+    let db, auth;
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      auth = firebase.auth();
+    } catch (e) {
+      showError("Firebase init failed: " + e.message);
     }
 
-    auth.signInAnonymously().catch(e=>showError('Auth failed: '+e.message));
-    auth.onAuthStateChanged(user=>{
-      if(user){
-        document.getElementById('adminDiv').classList.remove('hidden');
-        startListening();
+    let authed = false;
+    let currentSellId = null; // path key for open position being sold
+
+    // Enable/disable write controls depending on auth
+    function reflectAuthInUI() {
+      $("importBtn").disabled = !authed;
+      $("addBtn").disabled = !authed;
+      $("saveSaleBtn").disabled = !authed;
+
+      if (!authed) show($("modeBanner"));
+      else hide($("modeBanner"));
+    }
+
+    // ---- DATA PATHS (read from all historical locations) ----
+    const pathNew = () => `users/${OWNER}/transactions/${PORTFOLIO}`;
+    const pathOld = () => `users/${OWNER}/portfolios/${PORTFOLIO}/transactions`;
+    const pathHist = () => `users/${OWNER}/portfolios/${PORTFOLIO}/history`;
+
+    // Merge & sort transactions from all paths
+    async function fetchAllTransactionsOnce() {
+      const [s1, s2, s3] = await Promise.all([
+        db.ref(pathNew()).once("value"),
+        db.ref(pathOld()).once("value"),
+        db.ref(pathHist()).once("value"),
+      ]);
+      const d1 = s1.val() || {};
+      const d2 = s2.val() || {};
+      const d3 = s3.val() || {};
+
+      // Tag each with its source path so actions (sell/delete) can target correct path
+      const toList = (obj, basePath) =>
+        Object.entries(obj).map(([id, tx]) => ({ id, basePath, ...tx }));
+
+      const list = [
+        ...toList(d1, pathNew()),
+        ...toList(d2, pathOld()),
+        ...toList(d3, pathHist()),
+      ];
+
+      // chronological by primary date
+      list.sort((a, b) => {
+        const ad = a.p_date || a.s_date || 0;
+        const bd = b.p_date || b.s_date || 0;
+        return ad - bd;
+      });
+
+      return list;
+    }
+
+    // Live listener (primarily on the canonical NEW path) + refresh others ad-hoc
+    function startListening() {
+      const tbody = $("txTable").querySelector("tbody");
+
+      async function render() {
+        try {
+          const rows = await fetchAllTransactionsOnce();
+          tbody.innerHTML = "";
+
+          rows.forEach((tx) => {
+            const sym = (tx.sym || "").toUpperCase();
+            const qty = Number(tx.qty) || 0;
+            const pPrice = Number(tx.p_price);
+            const sPrice = Number(tx.s_price);
+            const buyDateStr = tx.p_date ? new Date(tx.p_date * 1000).toLocaleDateString("en-US") : "-";
+            const sellDateStr = tx.s_date ? new Date(tx.s_date * 1000).toLocaleDateString("en-US") : "-";
+            const hasSell = Number.isFinite(sPrice);
+            const pl = hasSell && Number.isFinite(pPrice) ? (sPrice - pPrice) * qty : null;
+
+            const tr = document.createElement("tr");
+            if (hasSell && Number.isFinite(pl)) tr.classList.add(pl >= 0 ? "gain" : "loss");
+
+            const actions = [];
+            if (!hasSell) {
+              actions.push(`<span class="btn-sell ${authed ? "" : "disabled"}" data-path="${tx.basePath}/${tx.id}">Sell</span>`);
+            }
+            actions.push(`<span class="btn-delete ${authed ? "" : "disabled"}" data-path="${tx.basePath}/${tx.id}">Delete</span>`);
+
+            tr.innerHTML = `
+              <td>${sym}</td>
+              <td>${qty}</td>
+              <td>${fmtMoney(Number.isFinite(pPrice) ? pPrice : NaN)}</td>
+              <td>${buyDateStr}</td>
+              <td>${hasSell ? fmtMoney(sPrice) : "-"}</td>
+              <td>${sellDateStr}</td>
+              <td>${hasSell && Number.isFinite(pl) ? fmtMoney(pl) : "-"}</td>
+              <td>${actions.join(" ")}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          // Wire action handlers (sell/delete)
+          tbody.querySelectorAll(".btn-sell").forEach(el => {
+            el.addEventListener("click", () => {
+              if (!authed) return alert("Sign-in required to sell.");
+              const path = el.getAttribute("data-path");
+              if (!path) return;
+              currentSellId = path;
+              showSellForm(path);
+            });
+          });
+          tbody.querySelectorAll(".btn-delete").forEach(el => {
+            el.addEventListener("click", async () => {
+              if (!authed) return alert("Sign-in required to delete.");
+              const path = el.getAttribute("data-path");
+              if (!path) return;
+              if (!confirm("Delete this transaction?")) return;
+              try {
+                await db.ref(path).remove();
+              } catch (e) {
+                showError("Delete failed: " + e.message);
+              }
+            });
+          });
+
+          setStatus(`Loaded ${rows.length} transactions.`);
+        } catch (e) {
+          showError("Render failed: " + e.message);
+        }
       }
-    });
 
-    // ---- BUY ----
-    function handleBuy(sym,qty,price,ts){
-      db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
-        const data=snap.val()||{};
-        const entry=Object.entries(data).find(([,tx])=>!tx.s_price);
-        if(entry){
-          const [id,tx]=entry;
-          const totalQty=tx.qty+qty;
-          const avgPrice=(tx.qty*tx.p_price+qty*price)/totalQty;
-          db.ref(`${TX_PATH}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
-        } else {
-          db.ref(TX_PATH).push({ sym,qty,p_price:price,p_date:ts });
+      // Listen to canonical path; when it changes, re-render everything
+      db.ref(pathNew()).on("value", render);
+      // Also render once at start (covers old/history paths on first paint)
+      render();
+    }
+
+    // ---- BUY handling (combine into open or create new) ----
+    async function handleBuy(sym, qty, price, ts) {
+      // canonical write location
+      const baseRef = db.ref(pathNew());
+
+      // find an open lot for this symbol (no s_price)
+      const snap = await baseRef.orderByChild("sym").equalTo(sym).once("value");
+      const data = snap.val() || {};
+      const openEntry = Object.entries(data).find(([, tx]) => !Number.isFinite(Number(tx.s_price)));
+
+      if (openEntry) {
+        const [id, tx] = openEntry;
+        const totalQty = Number(tx.qty || 0) + qty;
+        const avgPrice = ((Number(tx.qty || 0) * Number(tx.p_price || 0)) + (qty * price)) / (totalQty || 1);
+        await baseRef.child(id).update({
+          qty: totalQty,
+          p_price: avgPrice,
+          p_date: Math.min(Number(tx.p_date || ts), ts)
+        });
+      } else {
+        await baseRef.push({ sym, qty, p_price: price, p_date: ts });
+      }
+    }
+
+    // ---- SELL handling ----
+    function showSellForm(path) {
+      // preload qty with current open qty
+      db.ref(path).once("value").then(snap => {
+        const tx = snap.val() || {};
+        $("sQty").value = Number(tx.qty || 0);
+      });
+      $("sDate").value = new Date().toISOString().split("T")[0];
+      show($("sellForm"));
+    }
+    function hideSellForm() {
+      currentSellId = null;
+      $("sellTransactionForm").reset();
+      hide($("sellForm"));
+    }
+
+    // ---- WIRE UI ----
+    window.addEventListener("load", async () => {
+      reflectAuthInUI();
+
+      // Try anonymous sign-in (writes need auth != null by your rules)
+      try {
+        await auth.signInAnonymously();
+      } catch (e) {
+        // stay read-only
+      }
+
+      auth.onAuthStateChanged((user) => {
+        authed = !!user;
+        setStatus(authed ? "Signed in (anonymous)." : "Not signed in (read-only).");
+        reflectAuthInUI();
+      });
+
+      // Import (IB quick)
+      $("importBtn").addEventListener("click", async () => {
+        if (!authed) return alert("Sign-in required to import.");
+        try {
+          const txt = ($("quickInput").value || "").trim();
+          if (!txt) return alert("Paste a trade first.");
+
+          const m = txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,10})/i);
+          if (!m) return alert("Could not parse action/qty/symbol.");
+          const [, actionRaw, qtyS, symRaw] = m;
+          const action = actionRaw.toUpperCase();
+          const sym = symRaw.toUpperCase();
+          const qty = parseInt(qtyS, 10);
+
+          // date/time
+          let dt = $("importDate").value ? parseLocalDate($("importDate").value) : new Date();
+          const tm = txt.match(/(\d{2}:\d{2}:\d{2})/);
+          if (tm) { const [hh, mm, ss] = tm[1].split(":").map(Number); dt.setHours(hh, mm, ss); }
+          const ts = Math.floor(dt.getTime() / 1000);
+
+          // price (first number after the symbol occurrence)
+          const idx = txt.toUpperCase().indexOf(sym);
+          const rest = idx >= 0 ? txt.slice(idx + sym.length) : txt;
+          const pm = rest.match(/(-?\d+(?:\.\d+)?)/);
+          if (!pm) return alert("Could not parse price.");
+          const price = parseFloat(pm[1]);
+
+          if (action === "BOUGHT") {
+            await handleBuy(sym, qty, price, ts);
+          } else {
+            // SELL: find open lot on canonical path
+            const baseRef = db.ref(pathNew());
+            const snap = await baseRef.orderByChild("sym").equalTo(sym).once("value");
+            const data = snap.val() || {};
+            const open = Object.entries(data).find(([, tx]) => !Number.isFinite(Number(tx.s_price)));
+            if (!open) return alert("No open position for " + sym);
+
+            const [id, tx] = open;
+            if (qty > Number(tx.qty || 0)) return alert("Sell qty exceeds held.");
+
+            if (qty === Number(tx.qty || 0)) {
+              await baseRef.child(id).update({ s_price: price, s_date: ts });
+            } else {
+              // partial: close part, reduce open
+              const closedTx = { sym, qty, p_price: Number(tx.p_price || 0), p_date: Number(tx.p_date || ts), s_price: price, s_date: ts };
+              await baseRef.push(closedTx);
+              await baseRef.child(id).update({ qty: Number(tx.qty || 0) - qty });
+            }
+          }
+
+          $("quickInput").value = "";
+          $("importDate").value = "";
+        } catch (e) {
+          showError("Import failed: " + e.message);
         }
       });
-    }
 
-    // ---- QUICK IMPORT ----
-    document.getElementById('importBtn').onclick=()=>{
-      const txt=document.getElementById('quickInput').value.trim();
-      const m=txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
-      if(!m)return alert('Parse error');
-      const [_,action,qtyS,symRaw]=m,sym=symRaw.toUpperCase(),qty=parseInt(qtyS,10);
-      let dt=document.getElementById('importDate').value?parseLocalDate(document.getElementById('importDate').value):new Date();
-      const tm=txt.match(/(\d{2}:\d{2}:\d{2})/);if(tm){const[a,b,c]=tm[1].split(':').map(Number);dt.setHours(a,b,c);}const ts=Math.floor(dt.getTime()/1000);
-      const rest=txt.slice(txt.toUpperCase().indexOf(sym)+sym.length);
-      const pm=rest.match(/(-?\d+(?:\.\d+)?)/);if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
-
-      if(action.toUpperCase()==='BOUGHT') handleBuy(sym,qty,price,ts);
-      else {
-        db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
-          const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
-          if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
-          if(qty > tx2.qty) return alert('Sell qty exceeds held');
-          if(qty === tx2.qty){
-            db.ref(`${TX_PATH}/${id2}`).update({ s_price:price,s_date:ts });
-          } else {
-            const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
-            db.ref(TX_PATH).push(closedTx);
-            db.ref(`${TX_PATH}/${id2}`).update({ qty: tx2.qty - qty });
-          }
-        });
-      }
-      document.getElementById('quickInput').value='';
-      document.getElementById('importDate').value='';
-    };
-
-    // ---- MANUAL ADD ----
-    document.getElementById('addForm').onsubmit=e=>{
-      e.preventDefault();
-      const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
-      handleBuy(document.getElementById('sym').value.toUpperCase(),Number(document.getElementById('qty').value),Number(document.getElementById('bPrice').value),ts);
-      e.target.reset();
-    };
-
-    // ---- SELL FORM ----
-    const sellForm=document.getElementById('sellTransactionForm');
-    if(sellForm){
-      sellForm.onsubmit=e=>{
+      // Manual add
+      $("addForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const sQty = Number(document.getElementById('sQty').value);
-        const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value;
-        if(!sQty || !price||!dateVal||!currentSellId)return;
-        const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
-        db.ref(`${TX_PATH}/${currentSellId}`).once('value').then(snap => {
+        if (!authed) return alert("Sign-in required to add.");
+        try {
+          const sym = $("sym").value.toUpperCase();
+          const qty = Number($("qty").value);
+          const price = Number($("bPrice").value);
+          const dateStr = $("bDate").value;
+          if (!sym || !qty || !price || !dateStr) return;
+
+          const ts = Math.floor(parseLocalDate(dateStr).getTime() / 1000);
+          await handleBuy(sym, qty, price, ts);
+          e.target.reset();
+        } catch (e2) {
+          showError("Add buy failed: " + e2.message);
+        }
+      });
+
+      // Sell save/cancel
+      $("sellTransactionForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!authed) return alert("Sign-in required to sell.");
+        if (!currentSellId) return;
+        try {
+          const sQty = Number($("sQty").value);
+          const sPrice = Number($("sPrice").value);
+          const sDate = $("sDate").value;
+          if (!sQty || !sPrice || !sDate) return;
+
+          const ts = Math.floor(parseLocalDate(sDate).getTime() / 1000);
+          const snap = await db.ref(currentSellId).once("value");
           const tx = snap.val();
-          if(!tx || tx.s_price) return alert('Invalid position');
-          if(sQty > tx.qty) return alert('Sell qty exceeds held');
-          if(sQty === tx.qty){
-            db.ref(`${TX_PATH}/${currentSellId}`).update({ s_price:price,s_date:ts });
+          if (!tx || Number.isFinite(Number(tx.s_price))) throw new Error("Invalid or already closed.");
+
+          const held = Number(tx.qty || 0);
+          if (sQty > held) throw new Error("Sell qty exceeds held.");
+
+          const baseRef = db.ref(pathNew()); // always write to canonical path
+          if (sQty === held) {
+            await db.ref(currentSellId).update({ s_price: sPrice, s_date: ts });
           } else {
-            const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
-            db.ref(TX_PATH).push(closedTx);
-            db.ref(`${TX_PATH}/${currentSellId}`).update({ qty: tx.qty - sQty });
+            const closedTx = { sym: tx.sym, qty: sQty, p_price: Number(tx.p_price || 0), p_date: Number(tx.p_date || ts), s_price: sPrice, s_date: ts };
+            await baseRef.push(closedTx);
+            await db.ref(currentSellId).update({ qty: held - sQty });
           }
           hideSellForm();
-        });
-      };
-      document.getElementById('cancelSellBtn').onclick=hideSellForm;
-    }
-
-    function showSellForm(id){
-      currentSellId=id;
-      db.ref(`${TX_PATH}/${id}`).once('value').then(snap => {
-        const tx = snap.val();
-        document.getElementById('sQty').value = tx.qty;
+        } catch (e2) {
+          showError("Save sale failed: " + e2.message);
+        }
       });
-      document.getElementById('sellForm').classList.remove('hidden');
-      document.getElementById('sDate').value=new Date().toISOString().split('T')[0];
-    }
-    function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
+      $("cancelSellBtn").addEventListener("click", hideSellForm);
 
-    // ---- RENDER ----
-    function startListening(){
-      const tbody=document.querySelector('#txTable tbody');
-      db.ref(TX_PATH).on('value',snap=>{
-        tbody.innerHTML='';
-        const data=snap.val()||{};
-        Object.entries(data).forEach(([id,tx])=>{
-          const tr=document.createElement('tr');
-          const buyDate=new Date(tx.p_date*1000).toLocaleDateString('en-US');
-          const sellDate=tx.s_date?new Date(tx.s_date*1000).toLocaleDateString('en-US'):'-';
-          const pl=tx.s_price?(tx.s_price-tx.p_price)*tx.qty:0;
-          const actions=tx.s_price?`<span class='btn-delete'>Delete</span>`:`<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
-          tr.innerHTML=`<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price?`$${tx.s_price.toFixed(2)}`:'-'}</td><td>${sellDate}</td><td>${tx.s_price?`$${pl.toFixed(2)}`:'-'}</td><td>${actions}</td>`;
-          if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}
-          tbody.appendChild(tr);
-          if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);
-          tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`${TX_PATH}/${id}`).remove();};
-        });
-      });
-    }
+      // Start live view
+      startListening();
+    });
   </script>
 </body>
 </html>
