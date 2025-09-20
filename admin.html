@@ -128,22 +128,29 @@
       });
     }
 
-    // Quick Import
+    // ---- Quick Import ----
     document.getElementById('importBtn').onclick=()=>{
       const txt=document.getElementById('quickInput').value.trim();
       const m=txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
-      if(!m)return alert('Parse error');
-      const [_,action,qtyS,symRaw]=m,sym=symRaw.toUpperCase(),qty=parseInt(qtyS,10);
+      if(!m) return alert('Parse error');
+      const [_,action,qtyS,symRaw]=m, sym=symRaw.toUpperCase(), qty=parseInt(qtyS,10);
+
       let dt=document.getElementById('importDate').value?parseLocalDate(document.getElementById('importDate').value):new Date();
       const ts=Math.floor(dt.getTime()/1000);
+
       const rest=txt.slice(txt.toUpperCase().indexOf(sym)+sym.length);
-      const pm = rest.match(/(-?(?:\d+\.?\d*|\.\d+))/);
-      if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
+
+      // ✅ FIXED regex here: matches .9391 or 0.9391
+      const pm=rest.match(/(-?(?:\d+\.?\d*|\.\d+))/);
+      if(!pm) return alert('Price parse');
+      const price=parseFloat(pm[1]);
+
       if(action.toUpperCase()==='BOUGHT') handleBuy(sym,qty,price,ts);
       else {
         db.ref(getTxPath()).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
           const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
-          if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
+          if(!e2) return alert('No open '+sym);
+          const [id2,tx2]=e2;
           if(qty > tx2.qty) return alert('Sell qty exceeds held');
           if(qty === tx2.qty){db.ref(`${getTxPath()}/${id2}`).update({s_price:price,s_date:ts});}
           else {
@@ -153,10 +160,11 @@
           }
         });
       }
-      document.getElementById('quickInput').value='';document.getElementById('importDate').value='';
+      document.getElementById('quickInput').value='';
+      document.getElementById('importDate').value='';
     };
 
-    // Manual Add
+    // ---- Manual Add ----
     document.getElementById('addForm').onsubmit=e=>{
       e.preventDefault();
       const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
@@ -164,7 +172,7 @@
       e.target.reset();
     };
 
-    // Sell
+    // ---- SELL ----
     const sellForm=document.getElementById('sellTransactionForm');
     if(sellForm){
       sellForm.onsubmit=e=>{
@@ -175,8 +183,8 @@
         const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
         db.ref(`${getTxPath()}/${currentSellId}`).once('value').then(snap=>{
           const tx=snap.val();
-          if(!tx||tx.s_price)return alert('Invalid position');
-          if(sQty>tx.qty)return alert('Sell qty exceeds held');
+          if(!tx||tx.s_price) return alert('Invalid position');
+          if(sQty>tx.qty) return alert('Sell qty exceeds held');
           if(sQty===tx.qty){db.ref(`${getTxPath()}/${currentSellId}`).update({s_price:price,s_date:ts});}
           else {
             const closedTx={sym:tx.sym,qty:sQty,p_price:tx.p_price,p_date:tx.p_date,s_price:price,s_date:ts};
@@ -197,7 +205,7 @@
     }
     function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
 
-    // Render
+    // ---- RENDER ----
     function startListening(){
       const tbody=document.querySelector('#txTable tbody');tbody.innerHTML='';
       db.ref(getTxPath()).on('value',snap=>{
