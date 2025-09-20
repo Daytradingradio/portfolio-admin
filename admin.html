@@ -6,36 +6,45 @@
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
+    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 900px; margin: auto; }
     .hidden { display: none; }
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
     th { background: #f0f0f0; }
     tr.gain { background-color: #e8f5e9; }
     tr.loss { background-color: #fdecea; }
-    form { margin-top: 1rem; }
-    label { display: inline-block; width: 120px; }
-    input, textarea, button { padding: 4px 8px; margin: 4px; }
+    label { margin-right: 6px; }
     textarea { width: 100%; height: 3rem; font-family: inherit; }
     .btn-sell { color: #c0392b; cursor: pointer; margin-right: 8px; }
     .btn-delete { color: #e74c3c; cursor: pointer; }
-    #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
+    #sellForm, #quickImport { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
     .error { color: #e74c3c; font-weight: bold; margin-top: 1rem; }
   </style>
 </head>
 <body>
   <h1>Portfolio Admin</h1>
+
+  <!-- Portfolio toggle -->
+  <label for="portfolioSelect">Choose Portfolio:</label>
+  <select id="portfolioSelect">
+    <option value="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</option>
+    <option value="-LOWPRICE">Low Price Sleepers</option>
+  </select>
+
   <div id="errorMsg" class="error hidden"></div>
-  <div id="adminDiv">
-    <!-- Quick Import IB Trade -->
+  <div id="adminDiv" class="hidden">
+
+    <!-- Quick Import -->
     <h2>Quick Import IB Trade</h2>
     <div id="quickImport">
-      <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br>
+      <textarea id="quickInput" placeholder="Paste IB trade…"></textarea><br>
       <label>Trade Date:</label><input id="importDate" type="date"><br>
       <button id="importBtn">Import Trade</button>
     </div>
-    <!-- Manual Entry -->
+
+    <!-- Manual Add -->
     <h2>Add New Position</h2>
     <form id="addForm">
       <label>Symbol:</label><input id="sym" type="text" required><br>
@@ -44,6 +53,7 @@
       <label>Date:</label><input type="date" id="bDate" required><br>
       <button type="submit">Add Buy</button>
     </form>
+
     <!-- Sell Form -->
     <div id="sellForm" class="hidden">
       <h2>Sell Position</h2>
@@ -55,11 +65,15 @@
         <button type="button" id="cancelSellBtn">Cancel</button>
       </form>
     </div>
-    <!-- Transactions Table -->
-    <h2>Open & Closed Transactions</h2>
+
+    <!-- Transactions -->
+    <h2>Transactions</h2>
     <table id="txTable">
       <thead>
-        <tr><th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th><th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th></tr>
+        <tr>
+          <th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th>
+          <th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -76,61 +90,72 @@
       appId:"1:26263489272:web:fe7bc7af204fee016b490d"
     };
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const auth=firebase.auth(), db=firebase.database();
 
-    const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
-    const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
-    const TX_PATH = `users/${OWNER}/portfolios/${PORTFOLIO}/transactions`;
+    const OWNER="kzPiH0kcZUW0sQbLK0U7XqHC7572";
+    let currentPortfolio="-OURDUPWqDnRcVbg8zfZ";
 
-    let currentSellId = null;
+    function getTxPath(){
+      return `users/${OWNER}/portfolios/${currentPortfolio}/transactions`;
+    }
+
+    // Portfolio toggle
+    document.getElementById("portfolioSelect").addEventListener("change",(e)=>{
+      currentPortfolio=e.target.value;
+      startListening();
+    });
+
+    let currentSellId=null;
+    function showError(msg){const el=document.getElementById('errorMsg');el.textContent=msg;el.classList.remove('hidden');}
     function parseLocalDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+
+    auth.signInAnonymously().catch(e=>showError('Auth failed: '+e.message));
+    auth.onAuthStateChanged(user=>{if(user){document.getElementById('adminDiv').classList.remove('hidden');startListening();}});
 
     // ---- BUY ----
     function handleBuy(sym,qty,price,ts){
-      db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
+      db.ref(getTxPath()).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
         const data=snap.val()||{};
         const entry=Object.entries(data).find(([,tx])=>!tx.s_price);
         if(entry){
           const [id,tx]=entry;
           const totalQty=tx.qty+qty;
           const avgPrice=(tx.qty*tx.p_price+qty*price)/totalQty;
-          db.ref(`${TX_PATH}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
+          db.ref(`${getTxPath()}/${id}`).update({qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts)});
         } else {
-          db.ref(TX_PATH).push({ sym,qty,p_price:price,p_date:ts });
+          db.ref(getTxPath()).push({sym,qty,p_price:price,p_date:ts});
         }
       });
     }
 
-    // ---- QUICK IMPORT ----
+    // Quick Import
     document.getElementById('importBtn').onclick=()=>{
       const txt=document.getElementById('quickInput').value.trim();
       const m=txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
       if(!m)return alert('Parse error');
       const [_,action,qtyS,symRaw]=m,sym=symRaw.toUpperCase(),qty=parseInt(qtyS,10);
       let dt=document.getElementById('importDate').value?parseLocalDate(document.getElementById('importDate').value):new Date();
-      const tm=txt.match(/(\d{2}:\d{2}:\d{2})/);if(tm){const[a,b,c]=tm[1].split(':').map(Number);dt.setHours(a,b,c);}const ts=Math.floor(dt.getTime()/1000);
+      const ts=Math.floor(dt.getTime()/1000);
       const rest=txt.slice(txt.toUpperCase().indexOf(sym)+sym.length);
       const pm=rest.match(/(-?\d+(?:\.\d+)?)/);if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
-
       if(action.toUpperCase()==='BOUGHT') handleBuy(sym,qty,price,ts);
       else {
-        db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
+        db.ref(getTxPath()).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
           const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
           if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
           if(qty > tx2.qty) return alert('Sell qty exceeds held');
-          if(qty === tx2.qty){
-            db.ref(`${TX_PATH}/${id2}`).update({ s_price:price,s_date:ts });
-          } else {
-            const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
-            db.ref(TX_PATH).push(closedTx);
-            db.ref(`${TX_PATH}/${id2}`).update({ qty: tx2.qty - qty });
+          if(qty === tx2.qty){db.ref(`${getTxPath()}/${id2}`).update({s_price:price,s_date:ts});}
+          else {
+            const closedTx={sym,qty,p_price:tx2.p_price,p_date:tx2.p_date,s_price:price,s_date:ts};
+            db.ref(getTxPath()).push(closedTx);
+            db.ref(`${getTxPath()}/${id2}`).update({qty:tx2.qty-qty});
           }
         });
       }
       document.getElementById('quickInput').value='';document.getElementById('importDate').value='';
     };
 
-    // ---- MANUAL ADD ----
+    // Manual Add
     document.getElementById('addForm').onsubmit=e=>{
       e.preventDefault();
       const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
@@ -138,25 +163,24 @@
       e.target.reset();
     };
 
-    // ---- SELL FORM ----
+    // Sell
     const sellForm=document.getElementById('sellTransactionForm');
     if(sellForm){
       sellForm.onsubmit=e=>{
         e.preventDefault();
-        const sQty = Number(document.getElementById('sQty').value);
+        const sQty=Number(document.getElementById('sQty').value);
         const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value;
-        if(!sQty || !price||!dateVal||!currentSellId)return;
+        if(!sQty||!price||!dateVal||!currentSellId)return;
         const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
-        db.ref(`${TX_PATH}/${currentSellId}`).once('value').then(snap => {
-          const tx = snap.val();
-          if(!tx || tx.s_price) return alert('Invalid position');
-          if(sQty > tx.qty) return alert('Sell qty exceeds held');
-          if(sQty === tx.qty){
-            db.ref(`${TX_PATH}/${currentSellId}`).update({ s_price:price,s_date:ts });
-          } else {
-            const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
-            db.ref(TX_PATH).push(closedTx);
-            db.ref(`${TX_PATH}/${currentSellId}`).update({ qty: tx.qty - sQty });
+        db.ref(`${getTxPath()}/${currentSellId}`).once('value').then(snap=>{
+          const tx=snap.val();
+          if(!tx||tx.s_price)return alert('Invalid position');
+          if(sQty>tx.qty)return alert('Sell qty exceeds held');
+          if(sQty===tx.qty){db.ref(`${getTxPath()}/${currentSellId}`).update({s_price:price,s_date:ts});}
+          else {
+            const closedTx={sym:tx.sym,qty:sQty,p_price:tx.p_price,p_date:tx.p_date,s_price:price,s_date:ts};
+            db.ref(getTxPath()).push(closedTx);
+            db.ref(`${getTxPath()}/${currentSellId}`).update({qty:tx.qty-sQty});
           }
           hideSellForm();
         });
@@ -166,19 +190,16 @@
 
     function showSellForm(id){
       currentSellId=id;
-      db.ref(`${TX_PATH}/${id}`).once('value').then(snap => {
-        const tx = snap.val();
-        document.getElementById('sQty').value = tx.qty;
-      });
+      db.ref(`${getTxPath()}/${id}`).once('value').then(snap=>{const tx=snap.val();document.getElementById('sQty').value=tx.qty;});
       document.getElementById('sellForm').classList.remove('hidden');
       document.getElementById('sDate').value=new Date().toISOString().split('T')[0];
     }
     function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
 
-    // ---- RENDER ----
+    // Render
     function startListening(){
-      const tbody=document.querySelector('#txTable tbody');
-      db.ref(TX_PATH).on('value',snap=>{
+      const tbody=document.querySelector('#txTable tbody');tbody.innerHTML='';
+      db.ref(getTxPath()).on('value',snap=>{
         tbody.innerHTML='';
         const data=snap.val()||{};
         Object.entries(data).forEach(([id,tx])=>{
@@ -191,13 +212,10 @@
           if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}
           tbody.appendChild(tr);
           if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);
-          tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`${TX_PATH}/${id}`).remove();};
+          tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`${getTxPath()}/${id}`).remove();};
         });
       });
     }
-
-    // start immediately (no auth needed)
-    startListening();
   </script>
 </body>
 </html>
