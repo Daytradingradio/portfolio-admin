@@ -8,7 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
+    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 900px; margin: auto; }
     .hidden { display: none; }
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
@@ -17,16 +17,25 @@
     tr.loss { background-color: #fdecea; }
     form { margin-top: 1rem; }
     label { display: inline-block; width: 120px; }
-    input, textarea, button { padding: 4px 8px; margin: 4px; }
+    input, textarea, button, select { padding: 4px 8px; margin: 4px; }
     textarea { width: 100%; height: 3rem; font-family: inherit; }
     .btn-sell { color: #c0392b; cursor: pointer; margin-right: 8px; }
     .btn-delete { color: #e74c3c; cursor: pointer; }
     #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
     .error { color: #e74c3c; font-weight: bold; margin-top: 1rem; }
+    #portfolioSelector { margin-bottom: 1rem; }
   </style>
 </head>
 <body>
   <h1>Portfolio Admin</h1>
+
+  <!-- Portfolio toggle -->
+  <label for="portfolioSelector"><b>Select Portfolio:</b></label>
+  <select id="portfolioSelector">
+    <option value="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</option>
+    <option value="-LOWPRICE">Low Price Sleepers</option>
+  </select>
+
   <div id="errorMsg" class="error hidden"></div>
   <div id="adminDiv" class="hidden">
     <!-- Quick Import IB Trade -->
@@ -80,8 +89,8 @@
     const auth = firebase.auth(), db = firebase.database();
 
     const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
-    const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
-    const TX_PATH = `users/${OWNER}/portfolios/${PORTFOLIO}/transactions`;
+    let CURRENT_PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ"; // default
+    let TX_PATH = () => `users/${OWNER}/portfolios/${CURRENT_PORTFOLIO}/transactions`;
 
     let currentSellId = null;
     function showError(msg){
@@ -102,23 +111,23 @@
       }
     });
 
-    // ---- BUY ----
+    // BUY
     function handleBuy(sym,qty,price,ts){
-      db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
+      db.ref(TX_PATH()).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
         const data=snap.val()||{};
         const entry=Object.entries(data).find(([,tx])=>!tx.s_price);
         if(entry){
           const [id,tx]=entry;
           const totalQty=tx.qty+qty;
           const avgPrice=(tx.qty*tx.p_price+qty*price)/totalQty;
-          db.ref(`${TX_PATH}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
+          db.ref(`${TX_PATH()}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
         } else {
-          db.ref(TX_PATH).push({ sym,qty,p_price:price,p_date:ts });
+          db.ref(TX_PATH()).push({ sym,qty,p_price:price,p_date:ts });
         }
       });
     }
 
-    // ---- QUICK IMPORT ----
+    // QUICK IMPORT
     document.getElementById('importBtn').onclick=()=>{
       const txt=document.getElementById('quickInput').value.trim();
       const m=txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
@@ -131,16 +140,16 @@
 
       if(action.toUpperCase()==='BOUGHT') handleBuy(sym,qty,price,ts);
       else {
-        db.ref(TX_PATH).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
+        db.ref(TX_PATH()).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
           const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
           if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
           if(qty > tx2.qty) return alert('Sell qty exceeds held');
           if(qty === tx2.qty){
-            db.ref(`${TX_PATH}/${id2}`).update({ s_price:price,s_date:ts });
+            db.ref(`${TX_PATH()}/${id2}`).update({ s_price:price,s_date:ts });
           } else {
             const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
-            db.ref(TX_PATH).push(closedTx);
-            db.ref(`${TX_PATH}/${id2}`).update({ qty: tx2.qty - qty });
+            db.ref(TX_PATH()).push(closedTx);
+            db.ref(`${TX_PATH()}/${id2}`).update({ qty: tx2.qty - qty });
           }
         });
       }
@@ -148,7 +157,7 @@
       document.getElementById('importDate').value='';
     };
 
-    // ---- MANUAL ADD ----
+    // MANUAL ADD
     document.getElementById('addForm').onsubmit=e=>{
       e.preventDefault();
       const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
@@ -156,7 +165,7 @@
       e.target.reset();
     };
 
-    // ---- SELL FORM ----
+    // SELL FORM
     const sellForm=document.getElementById('sellTransactionForm');
     if(sellForm){
       sellForm.onsubmit=e=>{
@@ -165,16 +174,16 @@
         const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value;
         if(!sQty || !price||!dateVal||!currentSellId)return;
         const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
-        db.ref(`${TX_PATH}/${currentSellId}`).once('value').then(snap => {
+        db.ref(`${TX_PATH()}/${currentSellId}`).once('value').then(snap => {
           const tx = snap.val();
           if(!tx || tx.s_price) return alert('Invalid position');
           if(sQty > tx.qty) return alert('Sell qty exceeds held');
           if(sQty === tx.qty){
-            db.ref(`${TX_PATH}/${currentSellId}`).update({ s_price:price,s_date:ts });
+            db.ref(`${TX_PATH()}/${currentSellId}`).update({ s_price:price,s_date:ts });
           } else {
             const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
-            db.ref(TX_PATH).push(closedTx);
-            db.ref(`${TX_PATH}/${currentSellId}`).update({ qty: tx.qty - sQty });
+            db.ref(TX_PATH()).push(closedTx);
+            db.ref(`${TX_PATH()}/${currentSellId}`).update({ qty: tx.qty - sQty });
           }
           hideSellForm();
         });
@@ -184,7 +193,7 @@
 
     function showSellForm(id){
       currentSellId=id;
-      db.ref(`${TX_PATH}/${id}`).once('value').then(snap => {
+      db.ref(`${TX_PATH()}/${id}`).once('value').then(snap => {
         const tx = snap.val();
         document.getElementById('sQty').value = tx.qty;
       });
@@ -193,7 +202,7 @@
     }
     function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
 
-    // ---- RENDER MERGED ----
+    // RENDER
     function startListening(){
       const tbody=document.querySelector('#txTable tbody');
 
@@ -209,7 +218,7 @@
           if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}
           tbody.appendChild(tr);
           if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);
-          tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`${TX_PATH}/${id}`).remove();};
+          tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`${TX_PATH()}/${id}`).remove();};
         });
       }
 
@@ -217,22 +226,33 @@
         return { ...(snap1.val()||{}), ...(snap2.val()||{}), ...(snap3.val()||{}) };
       }
 
-      Promise.all([
-        db.ref(TX_PATH).once('value'),
-        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).once('value'),
-        db.ref(`users/${OWNER}/portfolios/${PORTFOLIO}/history`).once('value')
-      ]).then(([snap1,snap2,snap3])=>{
-        const merged=mergeSnapshots(snap1,snap2,snap3);
-        render(merged);
+      function loadAndRender(){
+        Promise.all([
+          db.ref(TX_PATH()).once('value'),
+          db.ref(`users/${OWNER}/transactions/${CURRENT_PORTFOLIO}`).once('value'),
+          db.ref(`users/${OWNER}/portfolios/${CURRENT_PORTFOLIO}/history`).once('value')
+        ]).then(([snap1,snap2,snap3])=>{
+          const merged=mergeSnapshots(snap1,snap2,snap3);
+          render(merged);
 
-        // also listen for new changes in primary path
-        db.ref(TX_PATH).on('value',()=>{
-          Promise.all([
-            db.ref(TX_PATH).once('value'),
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).once('value'),
-            db.ref(`users/${OWNER}/portfolios/${PORTFOLIO}/history`).once('value')
-          ]).then(([s1,s2,s3])=>render(mergeSnapshots(s1,s2,s3)));
+          // listen to live updates only on TX_PATH
+          db.ref(TX_PATH()).off();
+          db.ref(TX_PATH()).on('value',()=>{
+            Promise.all([
+              db.ref(TX_PATH()).once('value'),
+              db.ref(`users/${OWNER}/transactions/${CURRENT_PORTFOLIO}`).once('value'),
+              db.ref(`users/${OWNER}/portfolios/${CURRENT_PORTFOLIO}/history`).once('value')
+            ]).then(([s1,s2,s3])=>render(mergeSnapshots(s1,s2,s3)));
+          });
         });
+      }
+
+      loadAndRender();
+
+      // Toggle handler
+      document.getElementById('portfolioSelector').addEventListener('change', (e)=>{
+        CURRENT_PORTFOLIO = e.target.value;
+        loadAndRender();
       });
     }
   </script>
