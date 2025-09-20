@@ -137,7 +137,8 @@
       let dt=document.getElementById('importDate').value?parseLocalDate(document.getElementById('importDate').value):new Date();
       const ts=Math.floor(dt.getTime()/1000);
       const rest=txt.slice(txt.toUpperCase().indexOf(sym)+sym.length);
-      const pm=rest.match(/(-?\d+(?:\.\d+)?)/);if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
+      const pm = rest.match(/(-?(?:\d+\.?\d*|\.\d+))/);
+      if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
       if(action.toUpperCase()==='BOUGHT') handleBuy(sym,qty,price,ts);
       else {
         db.ref(getTxPath()).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
