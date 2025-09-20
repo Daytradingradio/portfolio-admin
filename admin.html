@@ -6,7 +6,6 @@
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
     .hidden { display: none; }
@@ -23,59 +22,44 @@
     .btn-delete { color: #e74c3c; cursor: pointer; }
     #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
     .error { color: #e74c3c; font-weight: bold; margin-top: 1rem; }
-    #portfolioSelect { margin-bottom: 1rem; }
   </style>
 </head>
 <body>
   <h1>Portfolio Admin</h1>
   <div id="errorMsg" class="error hidden"></div>
-  <div id="adminDiv" class="hidden">
-
-    <!-- Portfolio Toggle -->
-    <label for="portfolioSelect">Select Portfolio:</label>
-    <select id="portfolioSelect">
-      <option value="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</option>
-      <option value="-LOWPRICE">Low Price Sleepers</option>
-    </select>
-
+  <div id="adminDiv">
     <!-- Quick Import IB Trade -->
     <h2>Quick Import IB Trade</h2>
     <div id="quickImport">
-      <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37"></textarea><br>
+      <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br>
       <label>Trade Date:</label><input id="importDate" type="date"><br>
       <button id="importBtn">Import Trade</button>
     </div>
-
     <!-- Manual Entry -->
     <h2>Add New Position</h2>
     <form id="addForm">
       <label>Symbol:</label><input id="sym" type="text" required><br>
       <label>Qty:</label><input type="number" id="qty" required><br>
-      <label>Buy Price:</label><input type="number" step="0.0001" id="bPrice" required><br>
+      <label>Buy Price:</label><input type="number" step="0.01" id="bPrice" required><br>
       <label>Date:</label><input type="date" id="bDate" required><br>
       <button type="submit">Add Buy</button>
     </form>
-
     <!-- Sell Form -->
     <div id="sellForm" class="hidden">
       <h2>Sell Position</h2>
       <form id="sellTransactionForm">
         <label>Sell Qty:</label><input type="number" id="sQty" required><br>
-        <label>Sell Price:</label><input type="number" step="0.0001" id="sPrice" required><br>
+        <label>Sell Price:</label><input type="number" step="0.01" id="sPrice" required><br>
         <label>Sell Date:</label><input type="date" id="sDate" required><br>
         <button type="submit">Save Sale</button>
         <button type="button" id="cancelSellBtn">Cancel</button>
       </form>
     </div>
-
     <!-- Transactions Table -->
     <h2>Open & Closed Transactions</h2>
     <table id="txTable">
       <thead>
-        <tr>
-          <th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th>
-          <th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th>
-        </tr>
+        <tr><th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th><th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -83,7 +67,7 @@
 
   <script>
     const firebaseConfig = {
-      apiKey:"AIzaSyBF4g5RaDxPZNMWC7XqHC4xcwliKFwwnm8E",
+      apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
       authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com",
       databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
       projectId:"stock-portfolio-tracker-aefdf",
@@ -92,36 +76,14 @@
       appId:"1:26263489272:web:fe7bc7af204fee016b490d"
     };
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth(), db = firebase.database();
+    const db = firebase.database();
 
     const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
-    let currentPortfolio = "-OURDUPWqDnRcVbg8zfZ"; // default
-    let TX_PATH = `users/${OWNER}/portfolios/${currentPortfolio}/transactions`;
-
-    document.getElementById('portfolioSelect').onchange = (e) => {
-      currentPortfolio = e.target.value;
-      TX_PATH = `users/${OWNER}/portfolios/${currentPortfolio}/transactions`;
-      startListening(); // reload table
-    };
+    const PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
+    const TX_PATH = `users/${OWNER}/portfolios/${PORTFOLIO}/transactions`;
 
     let currentSellId = null;
-    function showError(msg){
-      const el=document.getElementById('errorMsg');
-      el.textContent=msg;
-      el.classList.remove('hidden');
-    }
-    function parseLocalDate(s){
-      const [y,m,d]=s.split('-').map(Number);
-      return new Date(y,m-1,d);
-    }
-
-    auth.signInAnonymously().catch(e=>showError('Auth failed: '+e.message));
-    auth.onAuthStateChanged(user=>{
-      if(user){
-        document.getElementById('adminDiv').classList.remove('hidden');
-        startListening();
-      }
-    });
+    function parseLocalDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
 
     // ---- BUY ----
     function handleBuy(sym,qty,price,ts){
@@ -132,14 +94,9 @@
           const [id,tx]=entry;
           const totalQty=tx.qty+qty;
           const avgPrice=(tx.qty*tx.p_price+qty*price)/totalQty;
-          db.ref(`${TX_PATH}/${id}`).update({
-            qty: totalQty,
-            p_price: avgPrice,
-            p_date: Math.min(tx.p_date, ts)
-          });
+          db.ref(`${TX_PATH}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
         } else {
-          // ✅ FIX: Save correct buy price, not qty
-          db.ref(TX_PATH).push({ sym, qty, p_price: price, p_date: ts });
+          db.ref(TX_PATH).push({ sym,qty,p_price:price,p_date:ts });
         }
       });
     }
@@ -164,27 +121,20 @@
           if(qty === tx2.qty){
             db.ref(`${TX_PATH}/${id2}`).update({ s_price:price,s_date:ts });
           } else {
-            // ✅ FIX: keep original p_price, not qty
             const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
             db.ref(TX_PATH).push(closedTx);
             db.ref(`${TX_PATH}/${id2}`).update({ qty: tx2.qty - qty });
           }
         });
       }
-      document.getElementById('quickInput').value='';
-      document.getElementById('importDate').value='';
+      document.getElementById('quickInput').value='';document.getElementById('importDate').value='';
     };
 
     // ---- MANUAL ADD ----
     document.getElementById('addForm').onsubmit=e=>{
       e.preventDefault();
       const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
-      handleBuy(
-        document.getElementById('sym').value.toUpperCase(),
-        Number(document.getElementById('qty').value),
-        Number(document.getElementById('bPrice').value),
-        ts
-      );
+      handleBuy(document.getElementById('sym').value.toUpperCase(),Number(document.getElementById('qty').value),Number(document.getElementById('bPrice').value),ts);
       e.target.reset();
     };
 
@@ -204,7 +154,6 @@
           if(sQty === tx.qty){
             db.ref(`${TX_PATH}/${currentSellId}`).update({ s_price:price,s_date:ts });
           } else {
-            // ✅ FIX: keep original buy price
             const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
             db.ref(TX_PATH).push(closedTx);
             db.ref(`${TX_PATH}/${currentSellId}`).update({ qty: tx.qty - sQty });
@@ -238,7 +187,7 @@
           const sellDate=tx.s_date?new Date(tx.s_date*1000).toLocaleDateString('en-US'):'-';
           const pl=tx.s_price?(tx.s_price-tx.p_price)*tx.qty:0;
           const actions=tx.s_price?`<span class='btn-delete'>Delete</span>`:`<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;
-          tr.innerHTML=`<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(4)}</td><td>${buyDate}</td><td>${tx.s_price?`$${tx.s_price.toFixed(4)}`:'-'}</td><td>${sellDate}</td><td>${tx.s_price?`$${pl.toFixed(2)}`:'-'}</td><td>${actions}</td>`;
+          tr.innerHTML=`<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price?`$${tx.s_price.toFixed(2)}`:'-'}</td><td>${sellDate}</td><td>${tx.s_price?`$${pl.toFixed(2)}`:'-'}</td><td>${actions}</td>`;
           if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}
           tbody.appendChild(tr);
           if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);
@@ -246,6 +195,9 @@
         });
       });
     }
+
+    // start immediately (no auth needed)
+    startListening();
   </script>
 </body>
 </html>
