@@ -17,18 +17,19 @@
     label { margin-right: 6px; }
     .hidden { display: none; }
     textarea { width: 100%; height: 3rem; font-family: inherit; }
+    #holdingsTable { margin-top: 2rem; }
+    button { margin: 2px; padding: 4px 8px; cursor: pointer; }
+    .error { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>Portfolio Admin</h1>
-
   <label for="portfolioSelect">Choose Portfolio:</label>
   <select id="portfolioSelect">
     <option value="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</option>
     <option value="-LOWPRICE">Low Price Sleepers</option>
     <option value="-MOSTWANTED">10 Most Wanted</option>
   </select>
-
   <div id="adminDiv" class="hidden">
     <h2>Add Trade</h2>
     <form id="tradeForm">
@@ -39,7 +40,6 @@
       <label><input type="checkbox" id="isShort"> Short Trade (Sell Short)</label><br>
       <button type="submit">Add Trade</button>
     </form>
-
     <h2>Transactions</h2>
     <table>
       <thead>
@@ -47,7 +47,7 @@
       </thead>
       <tbody id="txBody"></tbody>
     </table>
-
+    <button onclick="exportCSV()">Export CSV</button>
     <div id="sellForm" class="hidden">
       <h3>Close Position (Sell or Buy to Cover)</h3>
       <label>Cover Qty:</label><input id="sQty" type="number"><br>
@@ -55,9 +55,16 @@
       <label>Date:</label><input id="sDate" type="date"><br>
       <button id="confirmSell">Confirm Close</button>
       <button id="cancelSell">Cancel</button>
+      <div id="sellError" class="error hidden"></div>
     </div>
+    <h2>Open Holdings</h2>
+    <table id="holdingsTable">
+      <thead>
+        <tr><th>Symbol</th><th>Open Qty</th><th>Avg Cost</th><th>Current Price</th><th>Unrealized P/L</th></tr>
+      </thead>
+      <tbody id="holdingsBody"></tbody>
+    </table>
   </div>
-
   <script>
     const firebaseConfig = {
       apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
@@ -73,18 +80,15 @@
     const OWNER="kzPiH0kcZUW0sQbLK0U7XqHC7572";
     let currentPortfolio="-OURDUPWqDnRcVbg8zfZ";
     let currentSellId=null;
-
-    auth.signInAnonymously();
+    auth.signInAnonymously().catch(err => console.error("Auth error:", err));
     auth.onAuthStateChanged(u=>{
-      if(u){document.getElementById("adminDiv").classList.remove("hidden"); loadTx();}
+      if(u){document.getElementById("adminDiv").classList.remove("hidden"); loadTx(); loadHoldings();}
+      else console.error("Auth failed - check Firebase rules");
     });
-
     document.getElementById("portfolioSelect").onchange=e=>{
-      currentPortfolio=e.target.value; loadTx();
+      currentPortfolio=e.target.value; loadTx(); loadHoldings();
     };
-
     function txPath(){return `users/${OWNER}/portfolios/${currentPortfolio}/transactions`; }
-
     document.getElementById("tradeForm").onsubmit=e=>{
       e.preventDefault();
       const sym=document.getElementById("sym").value.toUpperCase();
@@ -93,12 +97,19 @@
       const isShort=document.getElementById("isShort").checked;
       const ts=Math.floor(new Date(document.getElementById("date").value).getTime()/1000);
       const finalQty=isShort? -Math.abs(qty):Math.abs(qty);
-      db.ref(txPath()).push({sym,qty:finalQty,p_price:price,p_date:ts});
-      e.target.reset();
+      db.ref(txPath()).push({sym,qty:finalQty,p_price:price,p_date:ts})
+        .then(() => {
+          console.log("Trade added successfully");
+          e.target.reset();
+        })
+        .catch(err => {
+          console.error("Add trade failed:", err);
+          alert("Failed to add trade: " + err.message);
+        });
     };
-
     function loadTx(){
       const tbody=document.getElementById("txBody");
+      if(!tbody) return;
       tbody.innerHTML="";
       db.ref(txPath()).on("value",snap=>{
         tbody.innerHTML="";
@@ -122,27 +133,112 @@
         });
       });
     }
-
+    async function loadHoldings() {
+      const tbody = document.getElementById("holdingsBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      try {
+        const snap = await db.ref(txPath()).once("value");
+        const data = snap.val() || {};
+        const holdings = {};
+        Object.values(data).forEach(tx => {
+          const sym = tx.sym;
+          if (!holdings[sym]) holdings[sym] = { qty: 0, cost: 0 };
+          if (tx.s_price == null) {
+            holdings[sym].qty += tx.qty;
+            holdings[sym].cost += tx.p_price * tx.qty;
+          } else if (tx.s_price != null && tx.qty < 0) { // Handle short covers
+            holdings[sym].qty -= tx.qty;
+            holdings[sym].cost -= tx.p_price * tx.qty;
+          }
+        });
+        for (const [sym, h] of Object.entries(holdings)) {
+          if (h.qty === 0) continue;
+          const avg = h.cost / h.qty;
+          // Fetch current price (reuse your fetchPrice from viewer if needed, or simple API)
+          const price = await fetchCurrentPrice(sym); // Define this function below
+          const unrealizedPL = (price - avg) * h.qty;
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${sym}</td>
+            <td>${h.qty.toFixed(2)}</td>
+            <td>$${avg.toFixed(2)}</td>
+            <td>$${price.toFixed(2)}</td>
+            <td>$${unrealizedPL.toFixed(2)}</td>`;
+          tr.classList.add(unrealizedPL >= 0 ? "gain" : "loss");
+          tbody.appendChild(tr);
+        }
+      } catch (err) {
+        console.error("Load holdings failed:", err);
+        tbody.innerHTML = "<tr><td colspan='5' class='error'>Error loading holdings</td></tr>";
+      }
+    }
+    async function fetchCurrentPrice(symbol) {
+      // Simple fetch using Alpha Vantage (your key)
+      try {
+        const r = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=6T1GX5OJRQ7YCJJX`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j["Global Quote"] && j["Global Quote"]["05. price"]) return parseFloat(j["Global Quote"]["05. price"]);
+        }
+      } catch (err) {
+        console.warn("Price fetch failed for " + symbol, err);
+      }
+      return 0; // Fallback
+    }
     function showSell(id){
       currentSellId=id;
       const f=document.getElementById("sellForm");
       document.getElementById("sDate").value=new Date().toISOString().split("T")[0];
       f.classList.remove("hidden");
+      document.getElementById("sellError").classList.add("hidden");
     }
     document.getElementById("cancelSell").onclick=()=>{document.getElementById("sellForm").classList.add("hidden");};
-    document.getElementById("confirmSell").onclick=()=>{
+    document.getElementById("confirmSell").onclick=async()=>{
       if(!currentSellId)return;
       const sPrice=parseFloat(document.getElementById("sPrice").value);
       const sDate=Math.floor(new Date(document.getElementById("sDate").value).getTime()/1000);
-      db.ref(txPath()+"/"+currentSellId).once("value").then(s=>{
-        const tx=s.val();
-        if(!tx)return;
-        db.ref(txPath()+"/"+currentSellId).update({s_price:sPrice,s_date:sDate});
+      try {
+        const snap = await db.ref(txPath()+"/"+currentSellId).once("value");
+        const tx = snap.val();
+        if(!tx) throw new Error("Transaction not found");
+        await db.ref(txPath()+"/"+currentSellId).update({s_price:sPrice,s_date:sDate});
+        console.log("Position closed successfully");
+        alert("Position closed! Holdings updated.");
         document.getElementById("sellForm").classList.add("hidden");
-      });
+        loadHoldings(); // Recalculate and refresh holdings
+      } catch (err) {
+        console.error("Close position failed:", err);
+        document.getElementById("sellError").textContent = "Failed to close position: " + err.message;
+        document.getElementById("sellError").classList.remove("hidden");
+      }
     };
-
-    function delTx(id){ if(confirm("Delete transaction?")) db.ref(txPath()+"/"+id).remove(); }
+    function delTx(id){ 
+      if(confirm("Delete transaction?")) { 
+        db.ref(txPath()+"/"+id).remove().catch(err => {
+          console.error("Delete failed:", err);
+          alert("Failed to delete: " + err.message);
+        });
+      } 
+    }
+    function exportCSV() {
+      const tbody = document.getElementById("txBody");
+      const rows = tbody.querySelectorAll("tr");
+      let csvContent = "Symbol,Qty,Type,Price,Date,P/L\n";
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        if (cells.length >= 6) {
+          csvContent += `${cells[0].textContent},${cells[1].textContent},${cells[2].textContent},${cells[3].textContent},${cells[4].textContent},${cells[5].textContent}\n`;
+        }
+      });
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `portfolio_${currentPortfolio}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
   </script>
 </body>
 </html>
