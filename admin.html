@@ -1,75 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Portfolio Admin</title>
+  <!-- Firebase v8 (matches your project) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 900px; margin: auto; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    th { background: #f0f0f0; }
-    tr.gain { background-color: #e8f5e9; }
-    tr.loss { background-color: #fdecea; }
-    tr.short { background-color: #fff3e0; }
-    label { margin-right: 6px; }
-    .hidden { display: none; }
-    textarea { width: 100%; height: 3rem; font-family: inherit; }
-    #holdingsTable { margin-top: 2rem; }
-    button { margin: 2px; padding: 4px 8px; cursor: pointer; }
-    .error { color: red; font-weight: bold; }
-    .partial-note { font-size: 0.9em; color: #666; margin-top: 5px; }
+    body{font-family:Arial,sans-serif;padding:1rem;max-width:1000px;margin:auto}
+    h1{margin:.25rem 0 1rem}
+    label{margin-right:6px;display:inline-block;min-width:90px}
+    input[type="text"],input[type="number"],input[type="date"]{padding:4px 6px;margin:.15rem 0}
+    table{width:100%;border-collapse:collapse;margin-top:1rem}
+    th,td{border:1px solid #ccc;padding:6px;text-align:center}
+    th{background:#f7f7f7}
+    tr.gain{background:#e8f5e9}
+    tr.loss{background:#fdecea}
+    tr.short{background:#fff3e0}
+    .hidden{display:none}
+    .error{color:#c62828;font-weight:bold}
+    .note{color:#555;font-size:.9em}
+    button{padding:6px 10px;margin:2px;cursor:pointer}
   </style>
 </head>
 <body>
   <h1>Portfolio Admin</h1>
-  <label for="portfolioSelect">Choose Portfolio:</label>
-  <select id="portfolioSelect">
-    <option value="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</option>
-    <option value="-LOWPRICE">Low Price Sleepers</option>
-    <option value="-MOSTWANTED">10 Most Wanted</option>
-  </select>
+
+  <div>
+    <label for="portfolioSelect">Portfolio:</label>
+    <select id="portfolioSelect">
+      <option value="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</option>
+      <option value="-LOWPRICE">Low Price Sleepers</option>
+      <option value="-MOSTWANTED">10 Most Wanted</option>
+    </select>
+  </div>
+
   <div id="adminDiv" class="hidden">
-    <h2>Add Trade</h2>
+    <h2>Add Trade (Open)</h2>
     <form id="tradeForm">
-      <label>Symbol:</label><input id="sym" type="text" required><br>
-      <label>Qty:</label><input id="qty" type="number" required><br>
-      <label>Price:</label><input id="price" type="number" step="0.0001" required><br>
-      <label>Date:</label><input id="date" type="date" required><br>
-      <label><input type="checkbox" id="isShort"> Short Trade (Sell Short)</label><br>
-      <button type="submit">Add Trade</button>
+      <div><label>Symbol</label><input id="sym" type="text" required placeholder="AAPL"></div>
+      <div><label>Qty</label><input id="qty" type="number" step="1" required placeholder="100"></div>
+      <div><label>Price</label><input id="price" type="number" step="0.0001" required placeholder="135.42"></div>
+      <div><label>Date</label><input id="date" type="date" required></div>
+      <div><label></label><label><input type="checkbox" id="isShort"> Short (sell short)</label></div>
+      <button type="submit">Add Open Trade</button>
     </form>
+
     <h2>Transactions</h2>
+    <p class="note">Click <em>Close</em> on an open row to do a full or partial close. Closed rows compute realized P/L automatically.</p>
     <table>
       <thead>
-        <tr><th>Symbol</th><th>Qty</th><th>Buy/Sell</th><th>Price</th><th>Date</th><th>P/L</th><th>Action</th></tr>
+        <tr>
+          <th>Symbol</th><th>Qty</th><th>Side</th><th>Open Price</th><th>Open Date</th>
+          <th>Close Price</th><th>Close Date</th><th>Realized P/L</th><th>Actions</th>
+        </tr>
       </thead>
       <tbody id="txBody"></tbody>
     </table>
     <button onclick="exportCSV()">Export CSV</button>
+
     <div id="sellForm" class="hidden">
-      <h3>Close Position (Partial or Full Sell/Buy to Cover)</h3>
-      <label>Qty to Close (partial OK):</label><input id="sQty" type="number" required><br>
-      <label>Price:</label><input id="sPrice" type="number" step="0.0001" required><br>
-      <label>Date:</label><input id="sDate" type="date" required><br>
-      <div class="partial-note">Note: Partial closes create a new sell transaction; remaining position stays open.</div>
+      <h3>Close Position (Full or Partial)</h3>
+      <div class="note">This will create a new <strong>closed</strong> transaction for the qty you enter and reduce the selected open lot by the same amount. If the lot goes to zero it is removed.</div>
+      <div><label>Qty to close</label><input id="sQty" type="number" step="1" required></div>
+      <div><label>Close Price</label><input id="sPrice" type="number" step="0.0001" required></div>
+      <div><label>Close Date</label><input id="sDate" type="date" required></div>
       <button id="confirmSell">Confirm Close</button>
-      <button id="cancelSell">Cancel</button>
+      <button id="cancelSell" type="button">Cancel</button>
       <div id="sellError" class="error hidden"></div>
     </div>
-    <h2>Open Holdings Summary</h2>
+
+    <h2>Open Holdings (Live)</h2>
     <table id="holdingsTable">
       <thead>
-        <tr><th>Symbol</th><th>Open Qty</th><th>Avg Cost</th><th>Current Price</th><th>Unrealized P/L</th><th>% Change</th></tr>
+        <tr><th>Symbol</th><th>Open Qty</th><th>Avg Cost</th></tr>
       </thead>
       <tbody id="holdingsBody"></tbody>
     </table>
-    <div id="holdingsError" class="error hidden"></div>
   </div>
+
   <script>
-    const firebaseConfig = {
+    /* ---------- Firebase ---------- */
+    const firebaseConfig={
       apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
       authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com",
       databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
@@ -80,215 +93,204 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db=firebase.database(), auth=firebase.auth();
+
     const OWNER="kzPiH0kcZUW0sQbLK0U7XqHC7572";
     let currentPortfolio="-OURDUPWqDnRcVbg8zfZ";
-    let currentSellId=null;
-    auth.signInAnonymously().catch(err => console.error("Auth error:", err));
+    const txPath = () => `users/${OWNER}/portfolios/${currentPortfolio}/transactions`;
+
+    /* ---------- Auth ---------- */
+    auth.signInAnonymously().catch(e=>alert("Auth error: "+e.message));
     auth.onAuthStateChanged(u=>{
-      if(u){document.getElementById("adminDiv").classList.remove("hidden"); loadTx(); loadHoldings();}
-      else console.error("Auth failed - check Firebase rules");
+      if(u){ document.getElementById("adminDiv").classList.remove("hidden"); init(); }
     });
-    document.getElementById("portfolioSelect").onchange=e=>{
-      currentPortfolio=e.target.value; loadTx(); loadHoldings();
-    };
-    function txPath(){return `users/${OWNER}/portfolios/${currentPortfolio}/transactions`; }
-    document.getElementById("tradeForm").onsubmit=e=>{
+
+    document.getElementById("portfolioSelect").addEventListener("change",e=>{
+      currentPortfolio=e.target.value; init();
+    });
+
+    /* ---------- Add Open Trade ---------- */
+    document.getElementById("tradeForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
-      const sym=document.getElementById("sym").value.toUpperCase();
-      const qty=parseFloat(document.getElementById("qty").value);
-      const price=parseFloat(document.getElementById("price").value);
-      const isShort=document.getElementById("isShort").checked;
-      const ts=Math.floor(new Date(document.getElementById("date").value).getTime()/1000);
-      const finalQty=isShort? -Math.abs(qty):Math.abs(qty);
-      db.ref(txPath()).push({sym,qty:finalQty,p_price:price,p_date:ts})
-        .then(() => {
-          console.log("Trade added successfully");
-          e.target.reset();
-          loadHoldings(); // Refresh holdings after add
-        })
-        .catch(err => {
-          console.error("Add trade failed:", err);
-          alert("Failed to add trade: " + err.message);
-        });
-    };
-    function loadTx(){
-      const tbody=document.getElementById("txBody");
-      if(!tbody) return;
-      tbody.innerHTML="";
-      db.ref(txPath()).on("value",snap=>{
-        tbody.innerHTML="";
-        const data=snap.val()||{};
-        Object.entries(data).forEach(([id,tx])=>{
+      const sym = document.getElementById("sym").value.trim().toUpperCase();
+      const qtyAbs = Math.abs(parseFloat(document.getElementById("qty").value));
+      const price = parseFloat(document.getElementById("price").value);
+      const isShort = document.getElementById("isShort").checked;
+      const p_date = Math.floor(new Date(document.getElementById("date").value).getTime()/1000);
+
+      if(!sym || !qtyAbs || !price || !p_date){ alert("Please fill all fields."); return; }
+
+      const qty = isShort ? -qtyAbs : qtyAbs; // open lot sign
+      await db.ref(txPath()).push({ sym, qty, p_price: price, p_date }); // open transaction only
+      e.target.reset();
+    });
+
+    /* ---------- Transactions UI ---------- */
+    let currentSellId = null, currentOpenTx = null;
+
+    function init(){
+      loadTransactions();
+      loadOpenHoldings();
+      document.getElementById("sellForm").classList.add("hidden");
+      currentSellId=null; currentOpenTx=null;
+    }
+
+    function loadTransactions(){
+      const tbody = document.getElementById("txBody");
+      db.ref(txPath()).off(); // clear listeners
+      db.ref(txPath()).on("value", snap=>{
+        const rows = [];
+        const data = snap.val() || {};
+        tbody.innerHTML = "";
+        Object.entries(data).forEach(([id, tx])=>{
+          const isShort = tx.qty < 0;
+          const closed = tx.s_price!=null;
+          const side = closed ? "Closed" : (isShort ? "Short" : "Long");
+          const pl = closed
+            ? (isShort ? (tx.p_price - tx.s_price)*Math.abs(tx.qty) : (tx.s_price - tx.p_price)*tx.qty)
+            : null;
+
           const tr=document.createElement("tr");
-          const isShort=tx.qty<0;
-          const type=tx.s_price?"Closed":(isShort?"Short":"Long");
-          const pl=tx.s_price!=null?(isShort?(tx.p_price-tx.s_price)*Math.abs(tx.qty):(tx.s_price-tx.p_price)*tx.qty):0;
-          tr.innerHTML=`
+          tr.innerHTML = `
             <td>${tx.sym}</td>
             <td>${tx.qty}</td>
-            <td>${type}</td>
-            <td>$${tx.p_price.toFixed(2)}</td>
+            <td>${side}</td>
+            <td>$${Number(tx.p_price).toFixed(4)}</td>
             <td>${new Date(tx.p_date*1000).toLocaleDateString()}</td>
-            <td>${tx.s_price?pl.toFixed(2):"-"}</td>
-            <td>${tx.s_price?"":"<button onclick='showSell(\""+id+"\")'>Close</button>"} <button onclick='delTx(\""+id+"\")'>Del</button></td>`;
-          if(isShort) tr.classList.add("short");
-          if(tx.s_price) tr.classList.add(pl>=0?"gain":"loss");
+            <td>${closed ? "$"+Number(tx.s_price).toFixed(4) : "-"}</td>
+            <td>${closed ? new Date(tx.s_date*1000).toLocaleDateString() : "-"}</td>
+            <td>${pl!=null ? pl.toFixed(2) : "-"}</td>
+            <td>
+              ${closed ? "" : `<button onclick="showSell('${id}')">Close</button>`}
+              <button onclick="delTx('${id}')">Del</button>
+            </td>`;
+          if(closed) tr.classList.add(pl>=0?"gain":"loss");
+          else if(isShort) tr.classList.add("short");
           tbody.appendChild(tr);
         });
       });
     }
-    async function loadHoldings() {
-      const tbody = document.getElementById("holdingsBody");
-      const errorDiv = document.getElementById("holdingsError");
-      if (!tbody || !errorDiv) return;
-      tbody.innerHTML = "<tr><td colspan='6'>Loading...</td></tr>";
-      errorDiv.classList.add("hidden");
-      try {
-        const snap = await db.ref(txPath()).once("value");
-        const data = snap.val() || {};
-        const holdings = {};
-        Object.values(data).forEach(tx => {
-          const sym = tx.sym;
-          if (!holdings[sym]) holdings[sym] = { qty: 0, cost: 0, buys: [], sells: [] };
-          if (tx.s_price == null) { // Open buy/short
-            holdings[sym].qty += tx.qty;
-            holdings[sym].cost += tx.p_price * tx.qty;
-            holdings[sym].buys.push(tx);
-          } else { // Closed sell/cover
-            holdings[sym].qty -= tx.qty;
-            holdings[sym].cost -= tx.p_price * tx.qty;
-            holdings[sym].sells.push(tx);
-          }
-        });
-        tbody.innerHTML = "";
-        let hasHoldings = false;
-        for (const [sym, h] of Object.entries(holdings)) {
-          if (h.qty === 0) continue;
-          hasHoldings = true;
-          const avg = h.cost / h.qty;
-          const price = await fetchCurrentPrice(sym);
-          const unrealizedPL = (price - avg) * h.qty;
-          const pctChange = avg > 0 ? (unrealizedPL / (avg * h.qty)) * 100 : 0;
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${sym}</td>
-            <td>${h.qty.toFixed(2)}</td>
-            <td>$${avg.toFixed(2)}</td>
-            <td>$${price.toFixed(2)}</td>
-            <td>$${unrealizedPL.toFixed(2)}</td>
-            <td>${pctChange.toFixed(2)}%</td>`;
-          tr.classList.add(unrealizedPL >= 0 ? "gain" : "loss");
-          tbody.appendChild(tr);
-        }
-        if (!hasHoldings) {
-          tbody.innerHTML = "<tr><td colspan='6'>No open holdings</td></tr>";
-        }
-      } catch (err) {
-        console.error("Load holdings failed:", err);
-        tbody.innerHTML = "<tr><td colspan='6' class='error'>Error loading holdings: " + err.message + "</td></tr>";
-        errorDiv.textContent = "Failed to load holdings: " + err.message;
-        errorDiv.classList.remove("hidden");
-      }
-    }
-    async function fetchCurrentPrice(symbol) {
-      try {
-        const r = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=6T1GX5OJRQ7YCJJX`);
-        if (r.ok) {
-          const j = await r.json();
-          if (j["Global Quote"] && j["Global Quote"]["05. price"]) return parseFloat(j["Global Quote"]["05. price"]);
-        }
-      } catch (err) {
-        console.warn("Price fetch failed for " + symbol, err);
-      }
-      return 0; // Fallback
-    }
-    function showSell(id){
-      currentSellId=id;
-      const f=document.getElementById("sellForm");
-      document.getElementById("sDate").value=new Date().toISOString().split("T")[0];
-      f.classList.remove("hidden");
+
+    window.showSell = async (id)=>{
+      currentSellId = id;
+      const snap = await db.ref(`${txPath()}/${id}`).once("value");
+      currentOpenTx = snap.val();
+      if(!currentOpenTx || currentOpenTx.s_price!=null){ alert("This lot is already closed."); return; }
+
+      // Prefill defaults
+      document.getElementById("sQty").value = Math.abs(currentOpenTx.qty);
+      document.getElementById("sPrice").value = "";
+      document.getElementById("sDate").value = new Date().toISOString().slice(0,10);
       document.getElementById("sellError").classList.add("hidden");
-      // Pre-fill sQty with full qty for convenience
-      db.ref(txPath()+"/"+id).once("value").then(s=>{
-        const tx=s.val();
-        if(tx && tx.qty) document.getElementById("sQty").value = Math.abs(tx.qty);
-      });
-    }
-    document.getElementById("cancelSell").onclick=()=>{document.getElementById("sellForm").classList.add("hidden");};
-    document.getElementById("confirmSell").onclick=async()=>{
-      if(!currentSellId) return;
-      const sQty = parseFloat(document.getElementById("sQty").value);
-      const sPrice = parseFloat(document.getElementById("sPrice").value);
-      const sDate = Math.floor(new Date(document.getElementById("sDate").value).getTime()/1000);
-      if (!sQty || !sPrice || !sDate) {
-        alert("Please fill all fields");
-        return;
-      }
-      try {
-        const snap = await db.ref(txPath()+"/"+currentSellId).once("value");
-        const tx = snap.val();
-        if(!tx) throw new Error("Transaction not found");
-        const originalQty = tx.qty;
-        const closeQty = Math.abs(sQty) * (originalQty < 0 ? -1 : 1); // Match sign for short/long
-        if (Math.abs(closeQty) > Math.abs(originalQty)) {
-          alert("Close qty cannot exceed open qty");
-          return;
+      document.getElementById("sellForm").classList.remove("hidden");
+    };
+
+    document.getElementById("cancelSell").onclick = ()=>{
+      document.getElementById("sellForm").classList.add("hidden");
+      currentSellId = null; currentOpenTx = null;
+    };
+
+    document.getElementById("confirmSell").onclick = async ()=>{
+      const errDiv = document.getElementById("sellError");
+      errDiv.classList.add("hidden");
+      try{
+        if(!currentSellId || !currentOpenTx) throw new Error("No open lot selected.");
+
+        const closeAbs = Math.abs(parseFloat(document.getElementById("sQty").value));
+        const s_price = parseFloat(document.getElementById("sPrice").value);
+        const s_date = Math.floor(new Date(document.getElementById("sDate").value).getTime()/1000);
+
+        if(!closeAbs || !s_price || !s_date) throw new Error("Please fill every close field.");
+        const openQty = currentOpenTx.qty; // signed
+        if(closeAbs > Math.abs(openQty)) throw new Error("Close qty exceeds open qty.");
+
+        const sym = currentOpenTx.sym;
+        const sign = openQty < 0 ? -1 : 1;
+
+        const updates = {};
+        const newClosed = {
+          sym,
+          qty: sign * closeAbs,          // keep same sign as open lot
+          p_price: currentOpenTx.p_price,
+          p_date: currentOpenTx.p_date,
+          s_price,
+          s_date
+        };
+
+        // Push the closed lot
+        const pushKey = db.ref(txPath()).push().key;
+        updates[`${txPath()}/${pushKey}`] = newClosed;
+
+        // Update or remove the open lot
+        const remaining = Math.abs(openQty) - closeAbs;
+        if(remaining === 0){
+          updates[`${txPath()}/${currentSellId}`] = null; // delete open lot
+        }else{
+          updates[`${txPath()}/${currentSellId}/qty`] = sign * remaining;
         }
-        // For partial close, create new sell transaction
-        if (Math.abs(closeQty) < Math.abs(originalQty)) {
-          // Add new sell transaction for partial
-          await db.ref(txPath()).push({
-            sym: tx.sym,
-            qty: closeQty * -1, // Negative for sell/cover
-            p_price: sPrice, // Use sell price as "buy" for sell transaction
-            p_date: sDate,
-            s_price: tx.p_price, // Original buy price for P/L calc
-            s_date: tx.p_date // Original buy date
-          });
-          console.log("Partial close added as new sell transaction");
-        } else {
-          // Full close: update existing
-          await db.ref(txPath()+"/"+currentSellId).update({s_price:sPrice,s_date:sDate});
-          console.log("Full close updated existing transaction");
-        }
-        alert("Position closed! Holdings updated.");
+
+        await db.ref().update(updates);
         document.getElementById("sellForm").classList.add("hidden");
-        loadHoldings(); // Recalculate and refresh holdings
-      } catch (err) {
-        console.error("Close position failed:", err);
-        document.getElementById("sellError").textContent = "Failed to close position: " + err.message;
-        document.getElementById("sellError").classList.remove("hidden");
+        currentSellId=null; currentOpenTx=null;
+        loadOpenHoldings();
+      }catch(e){
+        errDiv.textContent = e.message;
+        errDiv.classList.remove("hidden");
       }
     };
-    function delTx(id){ 
-      if(confirm("Delete transaction?")) { 
-        db.ref(txPath()+"/"+id).remove().then(()=>{
-          console.log("Transaction deleted");
-          loadHoldings(); // Refresh after delete
-        }).catch(err => {
-          console.error("Delete failed:", err);
-          alert("Failed to delete: " + err.message);
+
+    window.delTx = (id)=>{
+      if(confirm("Delete this transaction?")){
+        db.ref(`${txPath()}/${id}`).remove();
+      }
+    };
+
+    /* ---------- Open Holdings (from remaining open lots only) ---------- */
+    function loadOpenHoldings(){
+      const tbody = document.getElementById("holdingsBody");
+      db.ref(txPath()).once("value").then(snap=>{
+        const txs = snap.val() || {};
+        const openLots = Object.values(txs).filter(t => t.s_price == null);
+        const agg = {};
+        openLots.forEach(t=>{
+          const k = t.sym.toUpperCase();
+          if(!agg[k]) agg[k] = { qty: 0, cost: 0 };
+          agg[k].qty += t.qty;                    // signed
+          agg[k].cost += t.qty * t.p_price;       // signed cost
         });
-      } 
-    }
-    function exportCSV() {
-      const tbody = document.getElementById("txBody");
-      const rows = tbody.querySelectorAll("tr");
-      let csvContent = "Symbol,Qty,Type,Price,Date,P/L\n";
-      rows.forEach(row => {
-        const cells = row.querySelectorAll("td");
-        if (cells.length >= 6) {
-          csvContent += `"${cells[0].textContent}","${cells[1].textContent}","${cells[2].textContent}","${cells[3].textContent}","${cells[4].textContent}","${cells[5].textContent}"\n`;
+
+        tbody.innerHTML = "";
+        const rows = Object.entries(agg)
+          .filter(([_,v])=>v.qty!==0)
+          .map(([sym,v])=>{
+            const avg = v.cost / v.qty;           // signed avg; use abs for display
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${sym}</td><td>${v.qty}</td><td>$${Math.abs(avg).toFixed(4)}</td>`;
+            return tr;
+          });
+
+        if(!rows.length){
+          tbody.innerHTML = `<tr><td colspan="3">No open holdings</td></tr>`;
+        }else{
+          rows.forEach(r=>tbody.appendChild(r));
         }
       });
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `portfolio_${currentPortfolio}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
     }
+
+    /* ---------- CSV Export of table ---------- */
+    function exportCSV(){
+      const rows = [["Symbol","Qty","Side","Open Price","Open Date","Close Price","Close Date","Realized P/L"]];
+      document.querySelectorAll("#txBody tr").forEach(tr=>{
+        const cells = [...tr.querySelectorAll("td")].slice(0,8).map(td=>td.textContent.replace(/,/g,""));
+        if(cells.length) rows.push(cells);
+      });
+      const csv = rows.map(r=>r.map(v=>`"${v}"`).join(",")).join("\n");
+      const blob = new Blob([csv], {type:"text/csv"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `transactions_${currentPortfolio}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    }
+    window.exportCSV = exportCSV;
   </script>
 </body>
 </html>
