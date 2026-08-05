@@ -1,159 +1,1164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Portfolio Admin</title>
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 1rem; max-width: 800px; margin: auto; }
-    .hidden { display: none; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #f0f0f0; }
-    tr.gain { background-color: #e8f5e9; }
-    tr.loss { background-color: #fdecea; }
-    form { margin-top: 1rem; }
-    label { display: inline-block; width: 120px; }
-    input, textarea, button { padding: 4px 8px; margin: 4px; }
-    textarea { width: 100%; height: 3rem; font-family: inherit; }
-    .btn-sell { color: #c0392b; cursor: pointer; margin-right: 8px; }
-    .btn-delete { color: #e74c3c; cursor: pointer; }
-    #quickImport, #sellForm { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; margin-top: 1rem; }
-    .error { color: #e74c3c; font-weight: bold; margin-top: 1rem; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Portfolio Admin</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f4f5f7;--s1:#ffffff;--s2:#f0f1f4;--s3:#e6e8ec;
+  --bdr:#dcdee3;--bdr2:#c8cad0;
+  --tx:#1a1a2e;--tx2:#5a5a72;--tx3:#8a8a9e;
+  --red:#c41818;--red2:#b01414;--red-g:rgba(196,24,24,.07);
+  --grn:#0d8a3c;--grn2:#0a7030;--grn-g:rgba(13,138,60,.07);
+  --gld:#9a7000;--gld-g:rgba(154,112,0,.07);
+  --blu:#2070c8;--blu-g:rgba(32,112,200,.07);
+}
+html{font-size:15px;}
+body{background:var(--bg);color:var(--tx);font-family:'DM Sans',sans-serif;min-height:100vh;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:3px;}
+
+.shell{max-width:1100px;margin:0 auto;padding:20px 18px 60px;}
+
+/* Header */
+.hdr{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--bdr);margin-bottom:20px;}
+.hdr-logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;color:var(--red);letter-spacing:4px;}
+.hdr-sub{font-size:.78rem;color:var(--tx3);letter-spacing:.3px;}
+.hdr-r{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--grn);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.dot-label{font-size:.68rem;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+#authStatus{font-size:.72rem;color:var(--tx3);}
+
+/* Portfolio tabs */
+.tabs{display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;}
+.tab{background:var(--s1);border:1px solid var(--bdr);border-radius:7px;padding:7px 14px;color:var(--tx2);font-size:.8rem;font-weight:600;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif;}
+.tab:hover{border-color:var(--bdr2);color:var(--tx);}
+.tab.on{background:var(--red-g);border-color:var(--red);color:var(--red2);}
+
+/* Section headers */
+.sec{font-family:'Bebas Neue',sans-serif;font-size:.9rem;letter-spacing:2.5px;color:var(--tx3);margin:20px 0 10px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--bdr);}
+
+/* Cards */
+.card{background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+
+/* Inputs */
+label{display:block;font-size:.66rem;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;}
+label .sub{text-transform:none;font-weight:400;letter-spacing:0;color:var(--tx3);}
+input,select,textarea{
+  width:100%;background:var(--s2);border:1px solid var(--bdr);border-radius:7px;
+  color:var(--tx);padding:9px 11px;font-size:.88rem;font-family:'DM Sans',sans-serif;transition:.15s;
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(212,32,32,.08);}
+input::placeholder,textarea::placeholder{color:var(--tx3);}
+textarea{min-height:90px;font-family:'JetBrains Mono',monospace;font-size:.82rem;resize:vertical;line-height:1.6;}
+.sym-in{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700;text-transform:uppercase;text-align:center;letter-spacing:2px;}
+select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%235a5a72' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
+select option{background:var(--s2);color:var(--tx);}
+.check-row{display:flex;align-items:center;gap:6px;margin-top:6px;}
+.check-row input[type=checkbox]{width:auto;accent-color:var(--red);}
+.check-row label{margin:0;font-size:.82rem;color:var(--tx2);text-transform:none;letter-spacing:0;font-weight:500;}
+
+/* Grids */
+.g4{display:grid;grid-template-columns:110px 90px 130px 1fr;gap:10px;align-items:end;}
+@media(max-width:700px){.g4{grid-template-columns:1fr 1fr;}}
+
+/* Buttons */
+.brow{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;}
+.btn{display:inline-flex;align-items:center;gap:5px;border:none;border-radius:7px;padding:9px 16px;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;}
+.btn-grn{background:var(--grn);color:#fff;} .btn-grn:hover{background:var(--grn2);}
+.btn-red{background:var(--red);color:#fff;} .btn-red:hover{background:var(--red2);}
+.btn-gho{background:var(--s2);color:var(--tx2);border:1px solid var(--bdr);} .btn-gho:hover{border-color:var(--bdr2);color:var(--tx);}
+.btn-dan{background:transparent;color:#b33;border:1px solid rgba(180,50,50,.3);} .btn-dan:hover{background:rgba(180,50,50,.06);}
+.btn-sm{padding:5px 10px;font-size:.75rem;}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+
+/* Price flash */
+.pf{font-family:'JetBrains Mono',monospace;font-size:.82rem;color:var(--gld);margin-top:4px;min-height:1.1em;}
+
+/* Stats */
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.st{background:var(--s1);border:1px solid var(--bdr);border-radius:9px;padding:10px 14px;min-width:130px;flex:1;}
+.st-l{font-size:.62rem;color:var(--tx3);text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin-bottom:3px;}
+.st-v{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700;}
+.st-v.up{color:var(--grn2);} .st-v.dn{color:var(--red2);}
+
+/* Holdings table */
+.htbl{width:100%;border-collapse:separate;border-spacing:0 3px;}
+.htbl th{font-size:.62rem;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;font-weight:700;padding:4px 8px;text-align:left;border-bottom:1px solid var(--bdr);}
+.htbl td{padding:9px 8px;font-size:.84rem;background:var(--s1);border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr);}
+.htbl tr td:first-child{border-left:1px solid var(--bdr);border-radius:8px 0 0 8px;}
+.htbl tr td:last-child{border-right:1px solid var(--bdr);border-radius:0 8px 8px 0;}
+.htbl tr:hover td{background:var(--s2);}
+.mono{font-family:'JetBrains Mono',monospace;}
+.sym-cell{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:.95rem;letter-spacing:1px;}
+.dir-tag{font-size:.62rem;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:99px;display:inline-block;}
+.dir-l{background:var(--grn-g);color:var(--grn2);border:1px solid rgba(16,168,72,.2);}
+.dir-s{background:var(--red-g);color:var(--red2);border:1px solid rgba(212,32,32,.2);}
+.up{color:var(--grn2);} .dn{color:var(--red2);}
+
+/* Action buttons in holdings */
+.act{display:flex;gap:4px;}
+.cbtn{background:var(--gld-g);color:var(--gld);border:1px solid rgba(204,160,32,.2);border-radius:5px;padding:4px 9px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;text-transform:uppercase;letter-spacing:.4px;}
+.cbtn:hover{background:rgba(204,160,32,.2);border-color:var(--gld);}
+.ebtn{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2);border-radius:5px;padding:4px 9px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;text-transform:uppercase;letter-spacing:.4px;}
+.ebtn:hover{background:rgba(96,165,250,.2);border-color:#60a5fa;}
+.btn-blue{background:#1d4ed8;color:#fff;} .btn-blue:hover{background:#1e40af;}
+.xbtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:.85rem;padding:3px;border-radius:3px;transition:.1s;}
+.xbtn:hover{color:var(--red);background:var(--red-g);}
+
+/* Transaction table */
+.ttbl{width:100%;border-collapse:collapse;margin-top:8px;font-size:.82rem;}
+.ttbl th{font-size:.6rem;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:5px 6px;text-align:center;border-bottom:1px solid var(--bdr);}
+.ttbl td{padding:6px;text-align:center;border-bottom:1px solid var(--bdr);}
+.ttbl tr.g td{background:rgba(13,138,60,.06);} .ttbl tr.l td{background:rgba(196,24,24,.06);}
+.ttbl tr.sh td{background:rgba(255,165,0,.06);}
+
+/* Close Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(3px);z-index:1000;display:none;align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--bdr2);border-radius:14px;padding:24px;width:440px;max-width:92vw;box-shadow:0 16px 50px rgba(0,0,0,.15);}
+.modal h3{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px;color:var(--gld);margin-bottom:14px;}
+.modal-info{font-size:.84rem;color:var(--tx2);margin-bottom:14px;line-height:1.5;}
+.modal-info strong{color:var(--tx);font-family:'JetBrains Mono',monospace;}
+.modal .err{color:var(--red);font-size:.8rem;margin-top:6px;display:none;}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:9px;font-weight:600;font-size:.83rem;opacity:0;transform:translateY(6px);transition:.25s;pointer-events:none;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.ok{background:var(--grn);color:#fff;}
+.toast.err{background:var(--red);color:#fff;}
+.toast.info{background:var(--blu);color:#fff;}
+
+.note{font-size:.78rem;color:var(--tx3);margin:6px 0;line-height:1.5;}
+.imp-note{font-size:.75rem;color:var(--tx3);margin-top:6px;line-height:1.5;}
+.hidden{display:none;}
+
+@media(max-width:600px){.stats{flex-direction:column;}.pos-header{display:none;}}
+</style>
 </head>
 <body>
-  <h1>Portfolio Admin</h1>
-  <div id="errorMsg" class="error hidden"></div>
-  <div id="adminDiv" class="hidden">
-    <!-- Quick Import IB Trade -->
-    <h2>Quick Import IB Trade</h2>
-    <div id="quickImport">
-      <textarea id="quickInput" placeholder="Paste IB trade, e.g. BOUGHT 50 GEHC @ 82.32 USD NASDAQ 10:08:37 0.51"></textarea><br>
-      <label>Trade Date:</label><input id="importDate" type="date"><br>
-      <button id="importBtn">Import Trade</button>
+
+<div class="shell">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div>
+      <div class="hdr-logo">DTR ADMIN</div>
+      <div class="hdr-sub">Portfolio Trade Manager</div>
     </div>
-    <!-- Manual Entry -->
-    <h2>Add New Position</h2>
-    <form id="addForm">
-      <label>Symbol:</label><input id="sym" type="text" required><br>
-      <label>Qty:</label><input type="number" id="qty" required><br>
-      <label>Buy Price:</label><input type="number" step="0.01" id="bPrice" required><br>
-      <label>Date:</label><input type="date" id="bDate" required><br>
-      <button type="submit">Add Buy</button>
-    </form>
-    <!-- Sell Form -->
-    <div id="sellForm" class="hidden">
-      <h2>Sell Position</h2>
-      <form id="sellTransactionForm">
-        <label>Sell Qty:</label><input type="number" id="sQty" required><br>
-        <label>Sell Price:</label><input type="number" step="0.01" id="sPrice" required><br>
-        <label>Sell Date:</label><input type="date" id="sDate" required><br>
-        <button type="submit">Save Sale</button>
-        <button type="button" id="cancelSellBtn">Cancel</button>
-      </form>
+    <div class="hdr-r">
+      <div class="dot"></div>
+      <div class="dot-label">Live</div>
+      <span id="authStatus">Connecting…</span>
     </div>
-    <!-- Transactions Table -->
-    <h2>Open & Closed Transactions</h2>
-    <table id="txTable">
+  </div>
+
+  <!-- Portfolio Tabs -->
+  <div class="tabs">
+    <button class="tab on" data-pid="-OURDUPWqDnRcVbg8zfZ">Main Portfolio</button>
+    <button class="tab" data-pid="-LOWPRICE">Low Price Sleepers</button>
+    <button class="tab" data-pid="-MOSTWANTED">10 Most Wanted</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="st"><div class="st-l">Open Positions</div><div class="st-v" id="sPos">—</div></div>
+    <div class="st"><div class="st-l">Invested</div><div class="st-v" id="sInv">—</div></div>
+    <div class="st"><div class="st-l">Current Value</div><div class="st-v" id="sCur">—</div></div>
+    <div class="st"><div class="st-l">Unrealized P/L</div><div class="st-v" id="sUPL">—</div></div>
+    <div class="st"><div class="st-l">Realized P/L</div><div class="st-v" id="sRPL">—</div></div>
+  </div>
+
+  <!-- ADD TRADE -->
+  <div class="sec">Add Trade</div>
+  <div class="card">
+    <div class="g4">
+      <div>
+        <label>Symbol</label>
+        <input class="sym-in" id="f-sym" placeholder="FSLR" maxlength="6" oninput="this.value=this.value.toUpperCase();autoFetch()"/>
+      </div>
+      <div>
+        <label>Qty</label>
+        <input id="f-qty" type="number" min="1" placeholder="100"/>
+      </div>
+      <div>
+        <label>Price <span class="sub">(blank = live)</span></label>
+        <input id="f-price" type="number" step="0.0001" placeholder="Auto-fetch"/>
+      </div>
+      <div>
+        <label>Date <span class="sub">(default today)</span></label>
+        <input id="f-date" type="date"/>
+      </div>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="f-short"/>
+      <label for="f-short">Short (sell short)</label>
+    </div>
+    <div class="pf" id="priceFlash"></div>
+    <div class="brow">
+      <button class="btn btn-grn" id="addBtn" onclick="addTrade()">⚡ Add Open Trade</button>
+      <button class="btn btn-gho" onclick="clearAddForm()">Clear</button>
+    </div>
+  </div>
+
+  <!-- IBKR IMPORT -->
+  <div class="sec">Import IBKR Trades (Paste)</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:end;">
+      <div>
+        <label>Trade Date <span class="sub">(default today)</span></label>
+        <input id="imp-date" type="date"/>
+      </div>
+      <div>
+        <label>Paste Trades</label>
+        <textarea id="imp-data" placeholder="BOUGHT 100 VRCA @ 5.83 16:08:03 1.00 U235&#10;SOLD 40 TTWO 226.73 USD IEX 14:47:18&#10;SELL 50 AAPL @ 192.50"></textarea>
+      </div>
+    </div>
+    <div class="imp-note">Paste rows from IBKR. Accepts both formats: <strong>BOUGHT 40 TTWO 213.57</strong> or <strong>BOUGHT 40 TTWO @ 213.57</strong> — also accepts SOLD, SELL, SLD.</div>
+    <div class="brow">
+      <button class="btn btn-grn" onclick="importIBKR()">📋 Import Trades</button>
+    </div>
+    <div id="impErr" class="note" style="color:var(--red);display:none;"></div>
+  </div>
+
+  <!-- TRADE ALERT IMPORT -->
+  <div class="sec">Import from Trade Alerts (Paste Archive)</div>
+  <div class="card">
+    <label>Paste Trade Alert Archive</label>
+    <textarea id="alert-data" style="min-height:140px;" placeholder="Paste your trade alert archive here — all rows from the alerts table. BUYs become open positions, SOLDs/SLDs close matching positions."></textarea>
+    <div class="imp-note">Paste the full alert archive. The parser will extract all BOUGHT/SOLD/SLD trades, skip recaps and messages. Options trades are flagged for manual review.</div>
+    <div class="brow">
+      <button class="btn btn-gho" onclick="previewAlerts()">🔍 Preview</button>
+      <button class="btn btn-grn" id="alertImportBtn" onclick="executeAlertImport()" style="display:none;">⚡ Import All Trades</button>
+      <button class="btn btn-gho" onclick="clearAlertImport()" style="display:none;" id="alertClearBtn">Clear</button>
+    </div>
+    <div id="alertPreview" style="display:none;margin-top:14px;">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <span class="imp-note" style="margin:0;"><strong id="alertBuyCount">0</strong> Buys</span>
+        <span class="imp-note" style="margin:0;"><strong id="alertSellCount">0</strong> Sells</span>
+        <span class="imp-note" style="margin:0;color:var(--gld);"><strong id="alertSkipCount">0</strong> Skipped</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ttbl" id="alertPreviewTable">
+          <thead>
+            <tr><th>Date</th><th>Action</th><th>Qty</th><th>Symbol</th><th>Price</th><th>Status</th></tr>
+          </thead>
+          <tbody id="alertPreviewBody"></tbody>
+        </table>
+      </div>
+      <div id="alertSkipped" style="display:none;margin-top:8px;"></div>
+    </div>
+    <div id="alertErr" class="note" style="color:var(--red);display:none;"></div>
+    <div id="alertSuccess" class="note" style="color:var(--grn);display:none;"></div>
+  </div>
+
+  <!-- OPEN HOLDINGS -->
+  <div class="sec">Open Holdings (Live)</div>
+  <div id="holdingsWrap">
+    <table class="htbl">
       <thead>
-        <tr><th>Symbol</th><th>Qty</th><th>Avg Buy</th><th>Buy Date</th><th>Sell Price</th><th>Sell Date</th><th>P/L</th><th>Action</th></tr>
+        <tr><th>Symbol</th><th>Qty</th><th>Side</th><th>Avg Cost</th><th>Current</th><th>Unrealized P/L</th><th>% Chg</th><th>Days</th><th></th></tr>
       </thead>
-      <tbody></tbody>
+      <tbody id="hBody"></tbody>
     </table>
   </div>
-  <script>
-    const firebaseConfig = { apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E", authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com", databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com", projectId:"stock-portfolio-tracker-aefdf", storageBucket:"stock-portfolio-tracker-aefdf.appspot.com", messagingSenderId:"26263489272", appId:"1:26263489272:web:fe7bc7af204fee016b490d" };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth(), db = firebase.database();
-    const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572", PORTFOLIO = "-OURDUPWqDnRcVbg8zfZ";
-    let currentSellId = null;
-    function showError(msg){const el=document.getElementById('errorMsg');el.textContent=msg;el.classList.remove('hidden');}
-    function parseLocalDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
-    auth.signInAnonymously().catch(e=>showError('Auth failed: '+e.message));
-    auth.onAuthStateChanged(user=>{if(user){document.getElementById('adminDiv').classList.remove('hidden');startListening();}});
-    // Combine or push buy
-    function handleBuy(sym,qty,price,ts){
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).orderByChild('sym').equalTo(sym).once('value').then(snap=>{
-        const data=snap.val()||{};
-        const entry=Object.entries(data).find(([,tx])=>!tx.s_price);
-        if(entry){
-          const [id,tx]=entry;
-          const totalQty=tx.qty+qty;
-          const avgPrice=(tx.qty*tx.p_price+qty*price)/totalQty;
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).update({ qty:totalQty,p_price:avgPrice,p_date:Math.min(tx.p_date,ts) });
-        } else {
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push({ sym,qty,p_price:price,p_date:ts });
-        }
+  <div id="hErr" class="note" style="color:var(--red);display:none;"></div>
+
+  <!-- TRANSACTIONS -->
+  <div class="sec">Transactions</div>
+  <p class="note">Click <strong>Close</strong> on an open row for full or partial close. Closed rows show realized P/L.</p>
+  <div style="overflow-x:auto;">
+    <table class="ttbl">
+      <thead>
+        <tr>
+          <th>Symbol</th><th>Qty</th><th>Side</th><th>Open Price</th><th>Open Date</th>
+          <th>Close Price</th><th>Close Date</th><th>Realized P/L</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="txBody"></tbody>
+    </table>
+  </div>
+  <div class="brow" style="margin-top:10px;">
+    <button class="btn btn-gho btn-sm" onclick="exportCSV()">📥 Export CSV</button>
+    <button class="btn btn-dan btn-sm" onclick="clearAllTx()">🗑 Clear All</button>
+  </div>
+
+</div>
+
+<!-- CLOSE MODAL -->
+<div class="overlay" id="closeModal">
+  <div class="modal">
+    <h3>Close Position</h3>
+    <div class="modal-info" id="closeInfo"></div>
+    <div style="margin-bottom:10px;">
+      <label>Qty to Close <span class="sub">(default = full lot)</span></label>
+      <input id="c-qty" type="number" min="1"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label>Close Price <span class="sub">(blank = live price)</span></label>
+      <input id="c-price" type="number" step="0.0001" placeholder="Auto-fetch live"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label>Close Date <span class="sub">(default today)</span></label>
+      <input id="c-date" type="date"/>
+    </div>
+    <div class="pf" id="closePF"></div>
+    <div id="closeErr" class="err"></div>
+    <div class="brow">
+      <button class="btn btn-red" onclick="confirmClose()">Confirm Close</button>
+      <button class="btn btn-gho" onclick="hideModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="overlay" id="editModal">
+  <div class="modal">
+    <h3>Edit Position</h3>
+    <div class="modal-info" id="editInfo"></div>
+    <div style="margin-bottom:10px;">
+      <label>Quantity</label>
+      <input id="e-qty" type="number" min="1"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label>Avg Cost per Share</label>
+      <input id="e-price" type="number" step="0.0001"/>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label>Entry Date</label>
+      <input id="e-date" type="date"/>
+    </div>
+    <div class="sub" style="margin-bottom:10px;color:var(--tx3)">
+      * Multiple lots will be consolidated into one record on save.
+    </div>
+    <div id="editErr" class="err"></div>
+    <div class="brow">
+      <button class="btn btn-blue" onclick="confirmEdit()">Save Changes</button>
+      <button class="btn btn-gho" onclick="hideEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ FIREBASE ============ */
+const firebaseConfig = {
+  apiKey:"AIzaSyBF4g5RaDxPZNMWC7HXC4xcwliKFwwnm8E",
+  authDomain:"stock-portfolio-tracker-aefdf.firebaseapp.com",
+  databaseURL:"https://stock-portfolio-tracker-aefdf-default-rtdb.firebaseio.com",
+  projectId:"stock-portfolio-tracker-aefdf",
+  storageBucket:"stock-portfolio-tracker-aefdf.appspot.com",
+  messagingSenderId:"26263489272",
+  appId:"1:26263489272:web:fe7bc7af204fee016b490d"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+const OWNER = "kzPiH0kcZUW0sQbLK0U7XqHC7572";
+const FINNHUB = "d3gjv1hr01qpep677adgd3gjv1hr01qpep677ae0";
+const TWELVE = "bf0e86cb6e4a41b9b9fb0330212d6820";
+
+let portfolio = "-OURDUPWqDnRcVbg8zfZ";
+const txPath = () => `users/${OWNER}/portfolios/${portfolio}/transactions`;
+
+// Close modal state
+let closingId = null, closingTx = null, closingSym = "";
+
+/* ============ AUTH ============ */
+auth.signInAnonymously().catch(e => {
+  document.getElementById("authStatus").textContent = "Auth failed";
+  toast("Auth error: " + e.message, "err");
+});
+auth.onAuthStateChanged(u => {
+  if (u) {
+    document.getElementById("authStatus").textContent = "Connected";
+    init();
+  } else {
+    document.getElementById("authStatus").textContent = "Not authenticated";
+  }
+});
+
+/* ============ UTILS ============ */
+const fmt = (n,d=2) => Number.isFinite(+n) ? (+n).toFixed(d) : "—";
+const fmtM = n => Number.isFinite(+n) ? "$"+(+n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : "—";
+const toSec = t => { let x=Number(t); if(!Number.isFinite(x)||x<=0)return 0; if(x>1e12)x=Math.floor(x/1000); return x; };
+const dtStr = s => s ? new Date(s*1000).toLocaleDateString() : "—";
+const daysAgo = sec => { if(!sec)return"—"; return Math.max(0,Math.floor((Date.now()-sec*1000)/86400000)); };
+const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const dateToSec = ds => ds ? Math.floor(new Date(ds+"T12:00:00").getTime()/1000) : Math.floor(Date.now()/1000);
+
+function toast(msg, type="ok") {
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.className = "toast show " + type;
+  setTimeout(() => el.classList.remove("show"), 3200);
+}
+
+/* ============ PRICE FETCH (Finnhub + TwelveData fallback) ============ */
+const priceCache = {};
+async function fetchPrice(sym) {
+  if (priceCache[sym] && Date.now() - priceCache[sym].t < 60000) return priceCache[sym].p;
+  let p = null;
+  try {
+    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${FINNHUB}`);
+    if (r.ok) { const j = await r.json(); if (j && j.c > 0) p = +j.c; }
+  } catch {}
+  if (!p) {
+    try {
+      const r2 = await fetch(`https://api.twelvedata.com/price?symbol=${encodeURIComponent(sym)}&apikey=${TWELVE}`);
+      if (r2.ok) { const j2 = await r2.json(); if (j2 && j2.price) p = +j2.price; }
+    } catch {}
+  }
+  if (p) priceCache[sym] = { p, t: Date.now() };
+  return p;
+}
+
+let fetchTimeout = null;
+function autoFetch() {
+  clearTimeout(fetchTimeout);
+  const sym = document.getElementById("f-sym").value.trim();
+  if (sym.length < 1) { document.getElementById("priceFlash").textContent = ""; return; }
+  document.getElementById("priceFlash").textContent = "⏳ Fetching…";
+  fetchTimeout = setTimeout(async () => {
+    const p = await fetchPrice(sym);
+    document.getElementById("priceFlash").textContent = p ? `Live: $${fmt(p,4)}` : "Price not found";
+  }, 600);
+}
+
+/* ============ PORTFOLIO TABS ============ */
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("on"));
+    t.classList.add("on");
+    portfolio = t.dataset.pid;
+    init();
+  });
+});
+
+/* ============ INIT ============ */
+function init() {
+  document.getElementById("f-date").value = todayISO();
+  document.getElementById("imp-date").value = todayISO();
+  loadTransactions();
+  loadHoldings();
+}
+
+/* ============ ADD TRADE ============ */
+async function addTrade() {
+  const sym = document.getElementById("f-sym").value.trim().toUpperCase();
+  const qtyAbs = Math.abs(parseInt(document.getElementById("f-qty").value));
+  const isShort = document.getElementById("f-short").checked;
+  const dateVal = document.getElementById("f-date").value;
+  if (!sym) { toast("Enter a symbol","err"); return; }
+  if (!qtyAbs || qtyAbs <= 0) { toast("Enter quantity","err"); return; }
+
+  const btn = document.getElementById("addBtn");
+  btn.disabled = true; btn.textContent = "⏳ Adding…";
+
+  let price = parseFloat(document.getElementById("f-price").value);
+  if (!Number.isFinite(price) || price <= 0) {
+    toast("Fetching live price for " + sym + "…", "info");
+    price = await fetchPrice(sym);
+    if (!price) { toast("Could not fetch price for " + sym, "err"); btn.disabled = false; btn.textContent = "⚡ Add Open Trade"; return; }
+  }
+
+  const qty = isShort ? -qtyAbs : qtyAbs;
+  const p_date = dateToSec(dateVal);
+
+  try {
+    await db.ref(txPath()).push({ sym, qty, p_price: price, p_date });
+    toast(`✅ ${isShort?"Shorted":"Bought"} ${qtyAbs} ${sym} @ $${fmt(price,4)}`);
+    clearAddForm();
+    loadHoldings();
+  } catch (e) {
+    toast("Error: " + e.message, "err");
+  }
+  btn.disabled = false; btn.textContent = "⚡ Add Open Trade";
+}
+
+function clearAddForm() {
+  ["f-sym","f-qty","f-price"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("f-short").checked = false;
+  document.getElementById("f-date").value = todayISO();
+  document.getElementById("priceFlash").textContent = "";
+}
+
+/* ============ IBKR IMPORT ============ */
+async function importIBKR() {
+  const errDiv = document.getElementById("impErr");
+  errDiv.style.display = "none";
+  const text = document.getElementById("imp-data").value.trim();
+  const dateStr = document.getElementById("imp-date").value;
+  const importDate = dateToSec(dateStr);
+  if (!text) { errDiv.textContent = "Paste trade data first."; errDiv.style.display = "block"; return; }
+
+  try {
+    const lines = text.split("\n");
+    const updates = {};
+    let count = 0;
+    for (const line of lines) {
+      // Normalize whitespace (tabs + spaces → single space)
+      const flat = line.replace(/\s+/g, " ").trim();
+      if (!flat) continue;
+      // Match: BOUGHT/SOLD/SELL/SLD  qty  SYMBOL  [@]? price
+      const m = flat.match(/\b(BOUGHT|SOLD|SELL|SLD)\s+([\d,]+)\s+([A-Z][A-Z0-9]{0,5})\s+@?\s*([\d.]+)/);
+      if (!m) continue;
+      const action = m[1];
+      const symClean = m[3].toUpperCase();
+      const qtyAbs = Math.abs(parseFloat(m[2].replace(/,/g, "")));
+      const price = parseFloat(m[4]);
+      if (!symClean || !qtyAbs || !price) continue;
+      const isBuy = action === "BOUGHT";
+      const qty = isBuy ? qtyAbs : -qtyAbs;
+      const tx = isBuy
+        ? { sym: symClean, qty, p_price: price, p_date: importDate }
+        : { sym: symClean, qty, p_price: price, p_date: importDate, s_price: price, s_date: importDate };
+      const key = db.ref(txPath()).push().key;
+      updates[`${txPath()}/${key}`] = tx;
+      count++;
+    }
+    if (!count) throw new Error("No valid trades found.");
+    await db.ref().update(updates);
+    toast(`✅ Imported ${count} trade${count !== 1 ? 's' : ''}`);
+    document.getElementById("imp-data").value = "";
+    loadHoldings();
+  } catch (e) {
+    errDiv.textContent = "Import failed: " + e.message;
+    errDiv.style.display = "block";
+  }
+}
+
+/* ============ TRADE ALERT IMPORT ============ */
+let parsedAlerts = [];
+
+function parseAlertLines(text) {
+  const lines = text.split("\n").filter(l => l.trim());
+  const trades = [];
+  const skipped = [];
+
+  for (const line of lines) {
+    const fields = line.split("\t");
+    // Only process tradealerts rows (field index 3), skip recaps and others
+    if (fields.length < 5) continue;
+    const type = fields[3]?.trim();
+    if (type !== "tradealerts") continue;
+
+    // Normalize the full line to single spaces for regex matching
+    const flat = line.replace(/\s+/g, " ");
+
+    // Skip message-only lines (no BOUGHT/SOLD/SLD)
+    if (!/\b(BOUGHT|SOLD|SLD)\b/.test(flat)) {
+      skipped.push({ line: flat.substring(0, 120), reason: "No trade action found (message only)" });
+      continue;
+    }
+
+    // Check for options trades (symbol followed by expiry pattern like "Jul1726 35 CALL/PUT")
+    if (/\b(BOUGHT|SOLD|SLD)\s+[\d,]+\s+[A-Z]+\s+[A-Z][a-z]{2}\d{2,4}\s+\d+\s+(CALL|PUT)\b/.test(flat)) {
+      const optMatch = flat.match(/(BOUGHT|SOLD|SLD)\s+([\d,]+)\s+([A-Z]+\s+[A-Z][a-z]+\d+\s+\d+\s+(?:CALL|PUT))/);
+      skipped.push({ line: flat.substring(0, 120), reason: `Options trade: ${optMatch ? optMatch[3] : "detected"} — add manually` });
+      continue;
+    }
+
+    // Extract date from field 1 (e.g. "2026-06-05 10:09:47 EDT")
+    const dateField = fields[1]?.trim() || "";
+    const datePart = dateField.match(/^(\d{4}-\d{2}-\d{2})/);
+    const tradeDate = datePart ? datePart[1] : null;
+
+    // Match all BOUGHT/SOLD/SLD + qty + symbol + price in the line
+    const tradeRegex = /\b(BOUGHT|SOLD|SLD)\s+([\d,]+)\s+([A-Z][A-Z0-9]{0,5})\s+@?\s*([\d.]+)/g;
+    let m;
+    let found = false;
+    while ((m = tradeRegex.exec(flat)) !== null) {
+      found = true;
+      const action = m[1];
+      const qty = parseInt(m[2].replace(/,/g, ""));
+      const sym = m[3];
+      const price = parseFloat(m[4]);
+      if (!qty || !price || !sym) continue;
+
+      trades.push({
+        date: tradeDate,
+        dateSec: tradeDate ? Math.floor(new Date(tradeDate + "T12:00:00").getTime() / 1000) : Math.floor(Date.now() / 1000),
+        action,
+        isBuy: action === "BOUGHT",
+        qty,
+        sym,
+        price,
+        raw: flat.substring(0, 100)
       });
     }
-    // Quick import
-    document.getElementById('importBtn').onclick=()=>{
-      const txt=document.getElementById('quickInput').value.trim();
-      const m=txt.match(/\b(BOUGHT|SOLD)\b\s*(\d+)\s*([A-Z.]{1,6})/i);
-      if(!m)return alert('Parse error');
-      const [_,action,qtyS,symRaw]=m,sym=symRaw.toUpperCase(),qty=parseInt(qtyS,10);
-      let dt=document.getElementById('importDate').value?parseLocalDate(document.getElementById('importDate').value):new Date();
-      const tm=txt.match(/(\d{2}:\d{2}:\d{2})/);if(tm){const[a,b,c]=tm[1].split(':').map(Number);dt.setHours(a,b,c);}const ts=Math.floor(dt.getTime()/1000);
-      const rest=txt.slice(txt.toUpperCase().indexOf(sym)+sym.length);
-      const pm=rest.match(/(-?\d+(?:\.\d+)?)/);if(!pm)return alert('Price parse');const price=parseFloat(pm[1]);
-      if(action.toUpperCase()==='BOUGHT')handleBuy(sym,qty,price,ts);
-      else{ // sell
-        db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).orderByChild('sym').equalTo(sym).once('value').then(snap2=>{
-          const d2=snap2.val()||{};const e2=Object.entries(d2).find(([,tx])=>!tx.s_price);
-          if(!e2)return alert('No open '+sym);const [id2,tx2]=e2;
-          if(qty > tx2.qty) return alert('Sell qty exceeds held');
-          if(qty === tx2.qty){
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ s_price:price,s_date:ts });
+    if (!found) {
+      skipped.push({ line: flat.substring(0, 120), reason: "Could not parse trade details" });
+    }
+  }
+
+  // Sort chronologically
+  trades.sort((a, b) => a.dateSec - b.dateSec);
+  return { trades, skipped };
+}
+
+function previewAlerts() {
+  const text = document.getElementById("alert-data").value.trim();
+  const errDiv = document.getElementById("alertErr");
+  const successDiv = document.getElementById("alertSuccess");
+  errDiv.style.display = "none";
+  successDiv.style.display = "none";
+
+  if (!text) { errDiv.textContent = "Paste alert data first."; errDiv.style.display = "block"; return; }
+
+  const { trades, skipped } = parseAlertLines(text);
+  parsedAlerts = trades;
+
+  if (!trades.length) {
+    errDiv.textContent = "No trades found. Make sure you're pasting the full alert archive rows (not just recaps).";
+    errDiv.style.display = "block";
+    return;
+  }
+
+  // Show preview
+  const tbody = document.getElementById("alertPreviewBody");
+  tbody.innerHTML = "";
+  let buys = 0, sells = 0;
+
+  trades.forEach((t, i) => {
+    if (t.isBuy) buys++; else sells++;
+    const tr = document.createElement("tr");
+    tr.className = t.isBuy ? "" : "g";
+    tr.innerHTML = `
+      <td>${t.date || "—"}</td>
+      <td style="font-weight:600;color:${t.isBuy ? 'var(--blu)' : 'var(--grn)'}">${t.action}</td>
+      <td class="mono">${t.qty}</td>
+      <td class="mono" style="font-weight:700">${t.sym}</td>
+      <td class="mono">$${fmt(t.price, 4)}</td>
+      <td style="font-size:.75rem;color:var(--tx3);">${t.isBuy ? "→ Open position" : "→ Close position"}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("alertBuyCount").textContent = buys;
+  document.getElementById("alertSellCount").textContent = sells;
+  document.getElementById("alertSkipCount").textContent = skipped.length;
+  document.getElementById("alertPreview").style.display = "block";
+  document.getElementById("alertImportBtn").style.display = "";
+  document.getElementById("alertClearBtn").style.display = "";
+
+  // Show skipped
+  const skipDiv = document.getElementById("alertSkipped");
+  if (skipped.length) {
+    skipDiv.style.display = "block";
+    skipDiv.innerHTML = `<div class="imp-note" style="color:var(--gld);margin-bottom:6px;"><strong>Skipped ${skipped.length} row(s):</strong></div>` +
+      skipped.map(s => `<div class="imp-note" style="font-size:.72rem;">• ${s.reason}<br><span style="color:var(--tx3);">${s.line.substring(0, 80)}…</span></div>`).join("");
+  } else {
+    skipDiv.style.display = "none";
+  }
+}
+
+async function executeAlertImport() {
+  if (!parsedAlerts.length) { toast("No trades to import", "err"); return; }
+
+  const btn = document.getElementById("alertImportBtn");
+  btn.disabled = true; btn.textContent = "⏳ Importing…";
+
+  const errDiv = document.getElementById("alertErr");
+  const successDiv = document.getElementById("alertSuccess");
+  errDiv.style.display = "none";
+  successDiv.style.display = "none";
+
+  try {
+    // Load existing open lots from Firebase
+    const snap = await db.ref(txPath()).once("value");
+    const existingTxs = snap.val() || {};
+
+    // Build map of open lots: sym -> [{id, qty, p_price, p_date}]
+    const openMap = {};
+    Object.entries(existingTxs).forEach(([id, t]) => {
+      if (t.s_price != null) return;
+      const k = t.sym.toUpperCase();
+      if (!openMap[k]) openMap[k] = [];
+      openMap[k].push({ id, qty: t.qty, p_price: t.p_price, p_date: t.p_date });
+    });
+
+    const updates = {};
+    let buyCount = 0, sellCount = 0, closeErrors = [];
+    const lotFinalState = {}; // id -> null (delete) or newQty (update)
+
+    // Also track buys added during this import (for same-paste close matching)
+    const importedBuys = {}; // sym -> [{tempKey, qty, p_price, p_date}]
+
+    for (const t of parsedAlerts) {
+      if (t.isBuy) {
+        // Create open transaction
+        const key = db.ref(txPath()).push().key;
+        updates[`${txPath()}/${key}`] = {
+          sym: t.sym,
+          qty: t.qty,
+          p_price: t.price,
+          p_date: t.dateSec
+        };
+        // Track for in-paste matching
+        if (!importedBuys[t.sym]) importedBuys[t.sym] = [];
+        importedBuys[t.sym].push({ tempKey: key, qty: t.qty, p_price: t.price, p_date: t.dateSec });
+        buyCount++;
+      } else {
+        // SOLD/SLD — find open lot to close (FIFO: existing first, then in-paste buys)
+        let remaining = t.qty;
+
+        // Track final state of each existing lot to avoid Firebase path conflicts
+        // (e.g. one sell partially closes a lot, then another sell fully closes the remainder)
+
+        // Try existing Firebase lots first
+        const lots = openMap[t.sym] || [];
+        for (const lot of lots) {
+          if (remaining <= 0) break;
+          const lotQty = Math.abs(lot.qty);
+          if (lotQty <= 0) continue;
+          const closeQty = Math.min(lotQty, remaining);
+          const sign = lot.qty < 0 ? -1 : 1;
+
+          // Create closed transaction
+          const closeKey = db.ref(txPath()).push().key;
+          updates[`${txPath()}/${closeKey}`] = {
+            sym: t.sym,
+            qty: sign * closeQty,
+            p_price: lot.p_price,
+            p_date: lot.p_date,
+            s_price: t.price,
+            s_date: t.dateSec
+          };
+
+          // Track lot final state (don't write child paths directly)
+          const newRemaining = lotQty - closeQty;
+          if (newRemaining === 0) {
+            lotFinalState[lot.id] = null; // delete
+            lot.qty = 0;
           } else {
-            const closedTx = { sym, qty, p_price: tx2.p_price, p_date: tx2.p_date, s_price:price, s_date:ts };
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push(closedTx);
-            db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id2}`).update({ qty: tx2.qty - qty });
+            lotFinalState[lot.id] = sign * newRemaining;
+            lot.qty = sign * newRemaining;
           }
-        });
-      }
-      document.getElementById('quickInput').value='';document.getElementById('importDate').value='';
-    };
-    // Manual add
-    document.getElementById('addForm').onsubmit=e=>{
-      e.preventDefault();const dt=parseLocalDate(document.getElementById('bDate').value),ts=Math.floor(dt.getTime()/1000);
-      handleBuy(document.getElementById('sym').value.toUpperCase(),Number(document.getElementById('qty').value),Number(document.getElementById('bPrice').value),ts);
-      e.target.reset();
-    };
-    // Sell form
-    const sellForm=document.getElementById('sellTransactionForm');if(sellForm){sellForm.onsubmit=e=>{e.preventDefault();
-      const sQty = Number(document.getElementById('sQty').value);
-      const price=Number(document.getElementById('sPrice').value),dateVal=document.getElementById('sDate').value; 
-      if(!sQty || !price||!dateVal||!currentSellId)return;
-      const dt=parseLocalDate(dateVal),ts=Math.floor(dt.getTime()/1000);
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).once('value').then(snap => {
-        const tx = snap.val();
-        if(!tx || tx.s_price) return alert('Invalid position');
-        if(sQty > tx.qty) return alert('Sell qty exceeds held');
-        if(sQty === tx.qty){
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ s_price:price,s_date:ts });
-        } else {
-          const closedTx = { sym: tx.sym, qty: sQty, p_price: tx.p_price, p_date: tx.p_date, s_price:price, s_date:ts };
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).push(closedTx);
-          db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${currentSellId}`).update({ qty: tx.qty - sQty });
+          remaining -= closeQty;
         }
-        hideSellForm();
-      });
-    };document.getElementById('cancelSellBtn').onclick=hideSellForm;}
-    function showSellForm(id){currentSellId=id;
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).once('value').then(snap => {
-        const tx = snap.val();
-        document.getElementById('sQty').value = tx.qty;
-      });
-      document.getElementById('sellForm').classList.remove('hidden');document.getElementById('sDate').value=new Date().toISOString().split('T')[0];}
-    function hideSellForm(){currentSellId=null;document.getElementById('sellForm').classList.add('hidden');if(sellForm)sellForm.reset();}
-    // Render
-    function startListening(){
-      const tbody=document.querySelector('#txTable tbody');
-      db.ref(`users/${OWNER}/transactions/${PORTFOLIO}`).on('value',snap=>{tbody.innerHTML='';const data=snap.val()||{};Object.entries(data).forEach(([id,tx])=>{const tr=document.createElement('tr');const buyDate=new Date(tx.p_date*1000).toLocaleDateString('en-US');const sellDate=tx.s_date?new Date(tx.s_date*1000).toLocaleDateString('en-US'):'-';const pl=tx.s_price?(tx.s_price-tx.p_price)*tx.qty:0;const actions=tx.s_price?`<span class='btn-delete'>Delete</span>`:`<span class='btn-sell'>Sell</span><span class='btn-delete'>Delete</span>`;tr.innerHTML=`<td>${tx.sym}</td><td>${tx.qty}</td><td>$${tx.p_price.toFixed(2)}</td><td>${buyDate}</td><td>${tx.s_price?`$${tx.s_price.toFixed(2)}`:'-'}</td><td>${sellDate}</td><td>${tx.s_price?`$${pl.toFixed(2)}`:'-'}</td><td>${actions}</td>`;if(tx.s_price){tr.classList.add(pl>=0?'gain':'loss');}tbody.appendChild(tr);if(!tx.s_price)tr.querySelector('.btn-sell').onclick=()=>showSellForm(id);tr.querySelector('.btn-delete').onclick=()=>{if(confirm('Delete this transaction?'))db.ref(`users/${OWNER}/transactions/${PORTFOLIO}/${id}`).remove();};});});}
-  </script>
+
+        // Try in-paste buys if still remaining
+        const pasteBuys = importedBuys[t.sym] || [];
+        for (const pb of pasteBuys) {
+          if (remaining <= 0) break;
+          if (pb.qty <= 0) continue;
+          const closeQty = Math.min(pb.qty, remaining);
+
+          // Update the buy we already queued to be partial or fully closed
+          if (closeQty >= pb.qty) {
+            // Fully close: change the open tx to a closed tx
+            updates[`${txPath()}/${pb.tempKey}`].s_price = t.price;
+            updates[`${txPath()}/${pb.tempKey}`].s_date = t.dateSec;
+            pb.qty = 0;
+          } else {
+            // Partial: reduce the open tx, create a closed tx
+            updates[`${txPath()}/${pb.tempKey}`].qty = pb.qty - closeQty;
+            const closeKey = db.ref(txPath()).push().key;
+            updates[`${txPath()}/${closeKey}`] = {
+              sym: t.sym,
+              qty: closeQty,
+              p_price: pb.p_price,
+              p_date: pb.p_date,
+              s_price: t.price,
+              s_date: t.dateSec
+            };
+            pb.qty -= closeQty;
+          }
+          remaining -= closeQty;
+        }
+
+        if (remaining > 0) {
+          closeErrors.push(`${t.sym}: could not match ${remaining} of ${t.qty} shares to an open lot`);
+        }
+        sellCount++;
+      }
+    }
+
+    // Apply lot final states (each lot ID appears only once — no ancestor conflicts)
+    for (const [id, state] of Object.entries(lotFinalState)) {
+      if (state === null) {
+        updates[`${txPath()}/${id}`] = null;
+      } else {
+        updates[`${txPath()}/${id}/qty`] = state;
+      }
+    }
+
+    await db.ref().update(updates);
+
+    let msg = `✅ Imported ${buyCount} buy(s) and ${sellCount} sell(s)`;
+    if (closeErrors.length) {
+      msg += ` — ${closeErrors.length} partial match warning(s)`;
+      errDiv.innerHTML = closeErrors.map(e => `⚠️ ${e}`).join("<br>");
+      errDiv.style.display = "block";
+    }
+    successDiv.textContent = msg;
+    successDiv.style.display = "block";
+    toast(msg);
+
+    // Refresh
+    loadTransactions();
+    loadHoldings();
+
+  } catch (e) {
+    errDiv.textContent = "Import failed: " + e.message;
+    errDiv.style.display = "block";
+    toast("Import failed: " + e.message, "err");
+  }
+
+  btn.disabled = false; btn.textContent = "⚡ Import All Trades";
+}
+
+function clearAlertImport() {
+  document.getElementById("alert-data").value = "";
+  document.getElementById("alertPreview").style.display = "none";
+  document.getElementById("alertImportBtn").style.display = "none";
+  document.getElementById("alertClearBtn").style.display = "none";
+  document.getElementById("alertErr").style.display = "none";
+  document.getElementById("alertSuccess").style.display = "none";
+  document.getElementById("alertSkipped").style.display = "none";
+  parsedAlerts = [];
+}
+
+/* ============ TRANSACTIONS TABLE ============ */
+function loadTransactions() {
+  const tbody = document.getElementById("txBody");
+  db.ref(txPath()).off();
+  db.ref(txPath()).on("value", snap => {
+    tbody.innerHTML = "";
+    const data = snap.val() || {};
+    Object.entries(data).forEach(([id, tx]) => {
+      const isShort = tx.qty < 0;
+      const closed = tx.s_price != null;
+      const side = closed ? "Closed" : (isShort ? "Short" : "Long");
+      const pl = closed
+        ? (isShort ? (tx.p_price - tx.s_price) * Math.abs(tx.qty) : (tx.s_price - tx.p_price) * tx.qty)
+        : null;
+      const tr = document.createElement("tr");
+      tr.className = closed ? (pl >= 0 ? "g" : "l") : (isShort ? "sh" : "");
+      tr.innerHTML = `
+        <td class="mono" style="font-weight:600">${tx.sym}</td>
+        <td>${tx.qty}</td>
+        <td><span class="dir-tag ${isShort?'dir-s':'dir-l'}">${side}</span></td>
+        <td class="mono">$${fmt(tx.p_price,4)}</td>
+        <td>${dtStr(toSec(tx.p_date))}</td>
+        <td class="mono">${closed ? '$'+fmt(tx.s_price,4) : '—'}</td>
+        <td>${closed ? dtStr(toSec(tx.s_date)) : '—'}</td>
+        <td class="mono ${pl!=null?(pl>=0?'up':'dn'):''}">${pl != null ? (pl>=0?'+':'')+fmt(pl) : '—'}</td>
+        <td>
+          ${closed ? '' : `<button class="cbtn" onclick="showClose('${id}')">Close</button>`}
+          <button class="xbtn" onclick="delTx('${id}')" title="Delete">✕</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+/* ============ OPEN HOLDINGS ============ */
+async function loadHoldings() {
+  const tbody = document.getElementById("hBody");
+  const errDiv = document.getElementById("hErr");
+  errDiv.style.display = "none";
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--tx3);padding:20px;">Loading…</td></tr>';
+
+  try {
+    const snap = await db.ref(txPath()).once("value");
+    const txs = snap.val() || {};
+    const openLots = Object.entries(txs).filter(([_, t]) => t.s_price == null);
+    const closedTxs = Object.entries(txs).filter(([_, t]) => t.s_price != null);
+
+    // Realized P/L
+    let realized = 0;
+    closedTxs.forEach(([_, tx]) => {
+      const isShort = tx.qty < 0;
+      realized += isShort
+        ? (tx.p_price - tx.s_price) * Math.abs(tx.qty)
+        : (tx.s_price - tx.p_price) * tx.qty;
+    });
+
+    // Aggregate open lots by symbol
+    const agg = {};
+    openLots.forEach(([id, t]) => {
+      const k = t.sym.toUpperCase();
+      if (!agg[k]) agg[k] = { qty: 0, cost: 0, lots: [], minDate: Infinity };
+      agg[k].qty += t.qty;
+      agg[k].cost += t.qty * t.p_price;
+      agg[k].lots.push(id);
+      const d = toSec(t.p_date);
+      if (d && d < agg[k].minDate) agg[k].minDate = d;
+    });
+
+    tbody.innerHTML = "";
+    const syms = Object.keys(agg).filter(s => agg[s].qty !== 0).sort();
+    let positions = 0, invested = 0, current = 0, unreal = 0;
+
+    if (!syms.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--tx3);padding:30px;">No open positions</td></tr>';
+    }
+
+    for (const sym of syms) {
+      const v = agg[sym];
+      positions++;
+      const avg = v.cost / v.qty;
+      const isShort = v.qty < 0;
+      const absQty = Math.abs(v.qty);
+      const price = await fetchPrice(sym);
+      const val = price ? price * absQty : 0;
+      const pl = price ? (isShort ? (avg - price) * absQty : (price - avg) * absQty) : 0;
+      const pct = price && avg ? (isShort ? (avg - price) / Math.abs(avg) * 100 : (price - avg) / Math.abs(avg) * 100) : 0;
+      const days = v.minDate < Infinity ? daysAgo(v.minDate) : "—";
+      invested += Math.abs(v.cost);
+      if (price) current += val;
+      unreal += pl;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="sym-cell">${sym}</td>
+        <td class="mono">${v.qty}</td>
+        <td><span class="dir-tag ${isShort?'dir-s':'dir-l'}">${isShort?'SHORT':'LONG'}</span></td>
+        <td class="mono">$${fmt(Math.abs(avg),4)}</td>
+        <td class="mono">${price?'$'+fmt(price,4):'—'}</td>
+        <td class="mono ${pl>=0?'up':'dn'}">${(pl>=0?'+':'')+fmt(pl)}</td>
+        <td class="mono ${pct>=0?'up':'dn'}">${fmt(pct,1)}%</td>
+        <td style="color:var(--tx2)">${days}d</td>
+        <td class="act">
+          <button class="cbtn" onclick="showCloseAgg('${sym}')">Close</button>
+          <button class="ebtn" onclick="showEdit('${sym}',${Math.abs(avg).toFixed(4)},${v.qty},'${v.lots.join(',')}')">Edit</button>
+          <button class="xbtn" onclick="delAllLots('${sym}')" title="Delete (no sell record)">✕</button>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+
+    // Update stats
+    document.getElementById("sPos").textContent = positions;
+    document.getElementById("sInv").textContent = fmtM(invested);
+    document.getElementById("sCur").textContent = fmtM(current);
+    const uplEl = document.getElementById("sUPL");
+    uplEl.textContent = (unreal>=0?"+":"") + fmtM(unreal);
+    uplEl.className = "st-v " + (unreal >= 0 ? "up" : "dn");
+    const rplEl = document.getElementById("sRPL");
+    rplEl.textContent = (realized>=0?"+":"") + fmtM(realized);
+    rplEl.className = "st-v " + (realized >= 0 ? "up" : "dn");
+
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--red);padding:20px;">${e.message}</td></tr>`;
+    errDiv.textContent = e.message; errDiv.style.display = "block";
+  }
+}
+
+/* ============ CLOSE — from Transactions table (single lot) ============ */
+window.showClose = async (id) => {
+  const snap = await db.ref(`${txPath()}/${id}`).once("value");
+  const tx = snap.val();
+  if (!tx || tx.s_price != null) { toast("Already closed", "info"); return; }
+  closingId = id;
+  closingTx = tx;
+  closingSym = tx.sym.toUpperCase();
+  const isShort = tx.qty < 0;
+
+  document.getElementById("closeInfo").innerHTML = `
+    Closing <strong>${closingSym}</strong> — ${isShort?"Short":"Long"} ${Math.abs(tx.qty)} shares @ <strong>$${fmt(tx.p_price,4)}</strong>
+  `;
+  document.getElementById("c-qty").value = Math.abs(tx.qty);
+  document.getElementById("c-price").value = "";
+  document.getElementById("c-date").value = todayISO();
+  document.getElementById("closeErr").style.display = "none";
+
+  // Fetch live price
+  document.getElementById("closePF").textContent = "⏳ Fetching live price…";
+  document.getElementById("closeModal").classList.add("show");
+  const p = await fetchPrice(closingSym);
+  document.getElementById("closePF").textContent = p ? `Live: $${fmt(p,4)}` : "Could not fetch";
+};
+
+/* ============ CLOSE — from Holdings table (aggregated, pick first open lot) ============ */
+window.showCloseAgg = async (sym) => {
+  // Find first open lot for this symbol
+  const snap = await db.ref(txPath()).once("value");
+  const data = snap.val() || {};
+  const openLot = Object.entries(data).find(([_, t]) => t.sym.toUpperCase() === sym && t.s_price == null);
+  if (!openLot) { toast("No open lot found", "err"); return; }
+  showClose(openLot[0]);
+};
+
+function hideModal() { document.getElementById("closeModal").classList.remove("show"); closingId = null; closingTx = null; }
+
+/* ============ CONFIRM CLOSE (same logic as original admin) ============ */
+async function confirmClose() {
+  const errDiv = document.getElementById("closeErr");
+  errDiv.style.display = "none";
+  try {
+    if (!closingId || !closingTx) throw new Error("No open lot selected.");
+    const closeAbs = Math.abs(parseInt(document.getElementById("c-qty").value));
+    let s_price = parseFloat(document.getElementById("c-price").value);
+    const s_date = dateToSec(document.getElementById("c-date").value);
+
+    // Auto-fetch price if blank
+    if (!Number.isFinite(s_price) || s_price <= 0) {
+      toast("Fetching live price…", "info");
+      s_price = await fetchPrice(closingSym);
+      if (!s_price) throw new Error("Could not fetch live price. Enter manually.");
+    }
+    if (!closeAbs) throw new Error("Enter qty to close.");
+
+    const openQty = closingTx.qty;
+    if (closeAbs > Math.abs(openQty)) throw new Error("Close qty exceeds open qty.");
+
+    const sign = openQty < 0 ? -1 : 1;
+    const updates = {};
+
+    // Create closed transaction
+    const newClosed = {
+      sym: closingSym,
+      qty: sign * closeAbs,
+      p_price: closingTx.p_price,
+      p_date: closingTx.p_date,
+      s_price,
+      s_date
+    };
+    const pushKey = db.ref(txPath()).push().key;
+    updates[`${txPath()}/${pushKey}`] = newClosed;
+
+    // Update or remove open lot
+    const remaining = Math.abs(openQty) - closeAbs;
+    if (remaining === 0) {
+      updates[`${txPath()}/${closingId}`] = null;
+    } else {
+      updates[`${txPath()}/${closingId}/qty`] = sign * remaining;
+    }
+
+    await db.ref().update(updates);
+    const pl = sign === 1
+      ? (s_price - closingTx.p_price) * closeAbs
+      : (closingTx.p_price - s_price) * closeAbs;
+    toast(`✅ Closed ${closeAbs} ${closingSym} @ $${fmt(s_price,4)} — P/L: $${fmt(pl)} ${pl>=0?"(Gain)":"(Loss)"}`);
+    hideModal();
+    loadHoldings();
+  } catch (e) {
+    errDiv.textContent = e.message;
+    errDiv.style.display = "block";
+  }
+}
+
+/* ============ DELETE ============ */
+window.delTx = id => {
+  if (confirm("Delete this transaction?")) {
+    db.ref(`${txPath()}/${id}`).remove().then(() => { toast("Deleted","info"); loadHoldings(); }).catch(e => toast("Error: "+e.message,"err"));
+  }
+};
+
+/* Delete all open lots for a symbol (mistake correction, no sell record) */
+window.delAllLots = async (sym) => {
+  if (!confirm(`Delete ALL open ${sym} lots? This removes them without creating a sell record.`)) return;
+  try {
+    const snap = await db.ref(txPath()).once("value");
+    const data = snap.val() || {};
+    const updates = {};
+    Object.entries(data).forEach(([id, t]) => {
+      if (t.sym.toUpperCase() === sym && t.s_price == null) {
+        updates[`${txPath()}/${id}`] = null;
+      }
+    });
+    if (!Object.keys(updates).length) { toast("No open lots found", "info"); return; }
+    await db.ref().update(updates);
+    toast(`🗑 Deleted all open ${sym} lots`, "info");
+    loadHoldings();
+  } catch (e) {
+    toast("Error: " + e.message, "err");
+  }
+};
+
+/* ============ CLEAR ALL ============ */
+window.clearAllTx = () => {
+  if (confirm("Clear ALL transactions for this portfolio? Cannot be undone.")) {
+    db.ref(txPath()).remove().then(() => { toast("All cleared","info"); loadHoldings(); }).catch(e => toast("Error: "+e.message,"err"));
+  }
+};
+
+/* ============ CSV EXPORT ============ */
+window.exportCSV = () => {
+  const rows = [["Symbol","Qty","Side","Open Price","Open Date","Close Price","Close Date","Realized P/L"]];
+  document.querySelectorAll("#txBody tr").forEach(tr => {
+    const cells = [...tr.querySelectorAll("td")].slice(0,8).map(td => td.textContent.replace(/,/g,"").trim());
+    if (cells.length) rows.push(cells);
+  });
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `transactions_${portfolio}.csv`;
+  a.click();
+};
+
+/* ============ EDIT POSITION ============ */
+let editingSym = "", editingLotKeys = [];
+
+function showEdit(sym, avgCost, qty, lotKeysStr) {
+  editingSym = sym;
+  editingLotKeys = lotKeysStr.split(',').filter(Boolean);
+  document.getElementById("editInfo").innerHTML =
+    `Editing <b>${sym}</b> — ${Math.abs(qty)} shares @ $${parseFloat(avgCost).toFixed(4)}`;
+  document.getElementById("e-qty").value = Math.abs(qty);
+  document.getElementById("e-price").value = parseFloat(avgCost).toFixed(4);
+  // Set date to today as default
+  document.getElementById("e-date").value = new Date().toISOString().slice(0,10);
+  document.getElementById("editErr").textContent = "";
+  document.getElementById("editModal").classList.add("show");
+}
+
+function hideEditModal() {
+  document.getElementById("editModal").classList.remove("show");
+  editingSym = "";
+  editingLotKeys = [];
+}
+
+async function confirmEdit() {
+  const newQty   = parseFloat(document.getElementById("e-qty").value);
+  const newPrice = parseFloat(document.getElementById("e-price").value);
+  const newDate  = document.getElementById("e-date").value;
+  const errDiv   = document.getElementById("editErr");
+
+  if (!newQty || newQty <= 0)  { errDiv.textContent = "Enter a valid quantity."; return; }
+  if (!newPrice || newPrice <= 0) { errDiv.textContent = "Enter a valid price."; return; }
+  if (!editingLotKeys.length)  { errDiv.textContent = "No lot keys found."; return; }
+
+  errDiv.textContent = "";
+  const newTs = newDate ? Math.floor(new Date(newDate + 'T12:00:00').getTime() / 1000) : null;
+  const updates = {};
+
+  if (editingLotKeys.length === 1) {
+    // Single lot — update directly
+    updates[`${txPath()}/${editingLotKeys[0]}/qty`]     = newQty;
+    updates[`${txPath()}/${editingLotKeys[0]}/p_price`] = newPrice;
+    if (newTs) updates[`${txPath()}/${editingLotKeys[0]}/p_date`] = newTs;
+  } else {
+    // Multiple lots — keep first, update it, delete the rest
+    updates[`${txPath()}/${editingLotKeys[0]}/qty`]     = newQty;
+    updates[`${txPath()}/${editingLotKeys[0]}/p_price`] = newPrice;
+    if (newTs) updates[`${txPath()}/${editingLotKeys[0]}/p_date`] = newTs;
+    for (let i = 1; i < editingLotKeys.length; i++) {
+      updates[`${txPath()}/${editingLotKeys[i]}`] = null;
+    }
+  }
+
+  try {
+    await db.ref().update(updates);
+    hideEditModal();
+    toast(`${editingSym} updated — ${newQty} shares @ $${newPrice.toFixed(4)}`, "ok");
+    loadHoldings();
+    loadTx();
+  } catch (e) {
+    errDiv.textContent = "Save failed: " + e.message;
+  }
+}
+</script>
 </body>
 </html>
