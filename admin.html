@@ -1126,27 +1126,29 @@ async function confirmEdit() {
   const newDate  = document.getElementById("e-date").value;
   const errDiv   = document.getElementById("editErr");
 
-  if (!newQty || newQty <= 0)  { errDiv.textContent = "Enter a valid quantity."; return; }
+  if (!newQty || newQty <= 0)     { errDiv.textContent = "Enter a valid quantity."; return; }
   if (!newPrice || newPrice <= 0) { errDiv.textContent = "Enter a valid price."; return; }
-  if (!editingLotKeys.length)  { errDiv.textContent = "No lot keys found."; return; }
+  if (!editingLotKeys.length)     { errDiv.textContent = "No lot keys found."; return; }
 
   errDiv.textContent = "";
   const newTs = newDate ? Math.floor(new Date(newDate + 'T12:00:00').getTime() / 1000) : null;
   const updates = {};
 
-  if (editingLotKeys.length === 1) {
-    // Single lot — update directly
-    updates[`${txPath()}/${editingLotKeys[0]}/qty`]     = newQty;
-    updates[`${txPath()}/${editingLotKeys[0]}/p_price`] = newPrice;
-    if (newTs) updates[`${txPath()}/${editingLotKeys[0]}/p_date`] = newTs;
-  } else {
-    // Multiple lots — keep first, update it, delete the rest
-    updates[`${txPath()}/${editingLotKeys[0]}/qty`]     = newQty;
-    updates[`${txPath()}/${editingLotKeys[0]}/p_price`] = newPrice;
-    if (newTs) updates[`${txPath()}/${editingLotKeys[0]}/p_date`] = newTs;
-    for (let i = 1; i < editingLotKeys.length; i++) {
-      updates[`${txPath()}/${editingLotKeys[i]}`] = null;
-    }
+  // Build a clean record for the first lot — only include defined values
+  const applyToLot = (key) => {
+    updates[`${txPath()}/${key}/qty`]     = newQty;
+    updates[`${txPath()}/${key}/p_price`] = newPrice;
+    updates[`${txPath()}/${key}/p_date`]  = newTs || Math.floor(Date.now()/1000);
+    // Clear any null/undefined sell fields that might cause issues
+    updates[`${txPath()}/${key}/s_price`] = null;
+    updates[`${txPath()}/${key}/s_date`]  = null;
+  };
+
+  applyToLot(editingLotKeys[0]);
+
+  // Delete extra lots if multiple
+  for (let i = 1; i < editingLotKeys.length; i++) {
+    updates[`${txPath()}/${editingLotKeys[i]}`] = null;
   }
 
   try {
